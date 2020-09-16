@@ -1,20 +1,17 @@
-import glob
+import argparse
+from multiprocessing import Pool, cpu_count
+from pathlib import Path
 from random import Random
 
 from typing import Tuple, List, Dict
 
+from utils import hparams as hp
 from utils.display import *
 from utils.dsp import *
-from utils import hparams as hp
-from multiprocessing import Pool, cpu_count
+from utils.files import get_files, pickle_binary
 from utils.paths import Paths
-import pickle
-import argparse
-
 from utils.text import clean_text
 from utils.text.recipes import ljspeech
-from utils.files import get_files, pickle_binary
-from pathlib import Path
 
 
 # Helper functions for argument types
@@ -50,6 +47,8 @@ class Preprocessor:
             quant = encode_mu_law(y, mu=2**hp.bits) if hp.mu_law else float_2_label(y, bits=hp.bits)
         elif hp.voc_mode == 'MOL':
             quant = float_2_label(y, bits=16)
+        else:
+            raise ValueError(f'Unexpected voc mode {hp.voc_mode}, should be either RAW or MOL.')
 
         return mel.astype(np.float32), quant.astype(np.int64)
 
