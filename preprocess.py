@@ -1,18 +1,16 @@
-import glob
+import argparse
+from multiprocessing import Pool, cpu_count
+from pathlib import Path
 from random import Random
+
+from typing import Tuple, Dict
 
 from utils.display import *
 from utils.dsp import *
-from utils import hparams as hp
-from multiprocessing import Pool, cpu_count
+from utils.files import get_files, pickle_binary
 from utils.paths import Paths
-import pickle
-import argparse
-
 from utils.text import clean_text
 from utils.text.recipes import ljspeech
-from utils.files import get_files, pickle_binary
-from pathlib import Path
 
 
 # Helper functions for argument types
@@ -21,6 +19,38 @@ def valid_n_workers(num):
     if n < 1:
         raise argparse.ArgumentTypeError('%r must be an integer greater than 0' % num)
     return n
+
+
+class Preprocessor:
+
+    def __init__(self, paths: Paths, text_dict: Dict[str, str]):
+        self.paths = paths
+        self.text_dict = text_dict
+
+    def __call__(self, path: Path) -> Tuple[str, int, str]:
+        wav_id = path.stem
+        m, x = self._convert_file(path)
+        np.save(self.paths.mel/f'{wav_id}.npy', m, allow_pickle=False)
+        np.save(self.paths.quant/f'{wav_id}.npy', x, allow_pickle=False)
+        text = self.text_dict[wav_id]
+        text = clean_text(text)
+        return wav_id, m.shape[-1], text
+
+    def _convert_file(self, path: Path) -> Tuple[np.array, np.array]:
+        y = load_wav(path)
+        peak = np.abs(y).max()
+        if hp.peak_norm or peak > 1.0:
+            y /= peak
+        mel = melspectrogram(y)
+        if hp.voc_mode == 'RAW':
+            quant = encode_mu_law(y, mu=2**hp.bits) if hp.mu_law else float_2_label(y, bits=hp.bits)
+        elif hp.voc_mode == 'MOL':
+            quant = float_2_label(y, bits=16)
+        else:
+            raise ValueError(f'Unexpected voc mode {hp.voc_mode}, should be either RAW or MOL.')
+
+        return mel.astype(np.float32), quant.astype(np.int64)
+
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
 parser.add_argument('--path', '-p', help='directly point to dataset path (overrides hparams.wav_path')
@@ -37,43 +67,14 @@ extension = args.extension
 path = args.path
 
 
-def convert_file(path: Path):
-    y = load_wav(path)
-    peak = np.abs(y).max()
-    if hp.peak_norm or peak > 1.0:
-        y /= peak
-    mel = melspectrogram(y)
-    if hp.voc_mode == 'RAW':
-        quant = encode_mu_law(y, mu=2**hp.bits) if hp.mu_law else float_2_label(y, bits=hp.bits)
-    elif hp.voc_mode == 'MOL':
-        quant = float_2_label(y, bits=16)
+if __name__ == '__main__':
 
-    return mel.astype(np.float32), quant.astype(np.int64)
+    wav_files = get_files(path, extension)
+    paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
+    print(f'\n{len(wav_files)} {extension[1:]} files found in "{path}"\n')
+    assert len(wav_files) > 0, f'Found no wav files in {path}, exiting.'
 
-
-def process_wav(path: Path):
-    wav_id = path.stem
-    m, x = convert_file(path)
-    np.save(paths.mel/f'{wav_id}.npy', m, allow_pickle=False)
-    np.save(paths.quant/f'{wav_id}.npy', x, allow_pickle=False)
-    text = text_dict[wav_id]
-    text = clean_text(text)
-    return wav_id, m.shape[-1], text
-
-
-wav_files = get_files(path, extension)
-paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
-
-print(f'\n{len(wav_files)} {extension[1:]} files found in "{path}"\n')
-
-if len(wav_files) == 0:
-
-    print('Please point wav_path in hparams.py to your dataset,')
-    print('or use the --path option.\n')
-
-else:
     text_dict = ljspeech(path)
-
     n_workers = max(1, args.num_workers)
 
     simple_table([
@@ -88,7 +89,9 @@ else:
     pool = Pool(processes=n_workers)
     dataset = []
     cleaned_texts = []
-    for i, (item_id, length, cleaned_text) in enumerate(pool.imap_unordered(process_wav, wav_files), 1):
+    preprocessor = Preprocessor(paths, text_dict)
+
+    for i, (item_id, length, cleaned_text) in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):
         if item_id in text_dict:
             dataset += [(item_id, length)]
             cleaned_texts += [(item_id, cleaned_text)]
@@ -103,8 +106,7 @@ else:
     # sort val dataset longest to shortest
     val_dataset.sort(key=lambda d: -d[1])
 
-    for id, text in cleaned_texts:
-        text_dict[id] = text
+    text_dict = {id: text for id, text in cleaned_texts}
 
     pickle_binary(text_dict, paths.data/'text_dict.pkl')
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
