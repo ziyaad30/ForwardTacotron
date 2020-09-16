@@ -24,20 +24,6 @@ def valid_n_workers(num):
         raise argparse.ArgumentTypeError('%r must be an integer greater than 0' % num)
     return n
 
-parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
-parser.add_argument('--path', '-p', help='directly point to dataset path (overrides hparams.wav_path')
-parser.add_argument('--extension', '-e', metavar='EXT', default='.wav', help='file extension to search for in dataset folder')
-parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
-parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
-args = parser.parse_args()
-
-hp.configure(args.hp_file)  # Load hparams from file
-if args.path is None:
-    args.path = hp.wav_path
-
-extension = args.extension
-path = args.path
-
 
 class Preprocessor:
 
@@ -66,6 +52,21 @@ class Preprocessor:
             quant = float_2_label(y, bits=16)
 
         return mel.astype(np.float32), quant.astype(np.int64)
+
+
+parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
+parser.add_argument('--path', '-p', help='directly point to dataset path (overrides hparams.wav_path')
+parser.add_argument('--extension', '-e', metavar='EXT', default='.wav', help='file extension to search for in dataset folder')
+parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
+parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
+args = parser.parse_args()
+
+hp.configure(args.hp_file)  # Load hparams from file
+if args.path is None:
+    args.path = hp.wav_path
+
+extension = args.extension
+path = args.path
 
 
 if __name__ == '__main__':
