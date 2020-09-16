@@ -3,9 +3,8 @@ from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from random import Random
 
-from typing import Tuple, List, Dict
+from typing import Tuple, Dict
 
-from utils import hparams as hp
 from utils.display import *
 from utils.dsp import *
 from utils.files import get_files, pickle_binary
@@ -24,7 +23,7 @@ def valid_n_workers(num):
 
 class Preprocessor:
 
-    def __init__(self, paths: List[Path], text_dict: Dict[str, str]):
+    def __init__(self, paths: Paths, text_dict: Dict[str, str]):
         self.paths = paths
         self.text_dict = text_dict
 
