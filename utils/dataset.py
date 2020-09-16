@@ -42,14 +42,14 @@ def get_vocoder_datasets(path: Path, batch_size, train_gta):
     train_set = DataLoader(train_dataset,
                            collate_fn=collate_vocoder,
                            batch_size=batch_size,
-                           num_workers=2,
+                           num_workers=0,
                            shuffle=True,
                            pin_memory=True)
 
     val_set = DataLoader(val_dataset,
                          collate_fn=collate_vocoder,
                          batch_size=batch_size,
-                         num_workers=1,
+                         num_workers=0,
                          shuffle=False,
                          pin_memory=True)
 
@@ -59,7 +59,7 @@ def get_vocoder_datasets(path: Path, batch_size, train_gta):
 
     val_set_samples = DataLoader(val_dataset,
                                  batch_size=1,
-                                 num_workers=1,
+                                 num_workers=0,
                                  shuffle=False,
                                  pin_memory=True)
 
@@ -124,14 +124,14 @@ def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
                            collate_fn=lambda batch: collate_tts(batch, r),
                            batch_size=batch_size,
                            sampler=train_sampler,
-                           num_workers=1,
+                           num_workers=0,
                            pin_memory=True)
 
     val_set = DataLoader(val_dataset,
                          collate_fn=lambda batch: collate_tts(batch, r),
                          batch_size=batch_size,
                          sampler=None,
-                         num_workers=1,
+                         num_workers=0,
                          shuffle=False,
                          pin_memory=True)
 
