@@ -33,9 +33,8 @@ class VocoderDataset(Dataset):
 def get_vocoder_datasets(path: Path, batch_size, train_gta):
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
-    train_ids, train_lens = filter_max_len(train_data)
-    val_ids, val_lens = filter_max_len(val_data)
-
+    train_ids, train_lens = zip(*filter_max_len(train_data))
+    val_ids, val_lens = zip(*filter_max_len(val_data))
     train_dataset = VocoderDataset(path, train_ids, train_gta)
     val_dataset = VocoderDataset(path, val_ids, train_gta)
 
@@ -106,8 +105,17 @@ def collate_vocoder(batch):
 def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
-    train_ids, train_lens = filter_max_len(train_data)
-    val_ids, val_lens = filter_max_len(val_data)
+    train_data = filter_max_len(train_data)
+    val_data = filter_max_len(val_data)
+    train_len_original = len(train_data)
+    if model_type == 'forward':
+        attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
+        train_data = filter_bad_attentions(train_data, attention_score_dict)
+        val_data = filter_bad_attentions(val_data, attention_score_dict)
+        print(f'Using {len(train_data)} train files. '
+              f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+    train_ids, train_lens = zip(*train_data)
+    val_ids, val_lens = zip(*val_data)
     text_dict = unpickle_binary(path/'text_dict.pkl')
     if model_type == 'tacotron':
         train_dataset = TacoDataset(path, train_ids, text_dict)
@@ -124,14 +132,14 @@ def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
                            collate_fn=lambda batch: collate_tts(batch, r),
                            batch_size=batch_size,
                            sampler=train_sampler,
-                           num_workers=1,
+                           num_workers=0,
                            pin_memory=True)
 
     val_set = DataLoader(val_dataset,
                          collate_fn=lambda batch: collate_tts(batch, r),
                          batch_size=batch_size,
                          sampler=None,
-                         num_workers=1,
+                         num_workers=0,
                          shuffle=False,
                          pin_memory=True)
 
@@ -139,14 +147,21 @@ def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
 
 
 def filter_max_len(dataset):
-    dataset_ids = []
-    mel_lengths = []
+    dataset_filtered = []
     for item_id, mel_len in dataset:
         if mel_len <= hp.tts_max_mel_len:
-            dataset_ids += [item_id]
-            mel_lengths += [mel_len]
-    return dataset_ids, mel_lengths
-    
+            dataset_filtered.append((item_id, mel_len))
+    return dataset_filtered
+
+
+def filter_bad_attentions(dataset, attention_score_dict):
+    dataset_filtered = []
+    for item_id, mel_len in dataset:
+        align_score, sharp_score = attention_score_dict[item_id]
+        if align_score > hp.forward_min_attention_alignment and sharp_score > hp.forward_min_attention_sharpness:
+            dataset_filtered.append((item_id, mel_len))
+    return dataset_filtered
+
 
 class TacoDataset(Dataset):
 
