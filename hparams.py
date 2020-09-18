@@ -123,7 +123,7 @@ forward_schedule = [(1e-4, 10_000,  32),    # progressive training schedule
                     (1e-4, 300_000,  32),   # (lr, step, batch_size)
                     (2e-5, 600_000,  32)]   # (lr, step, batch_size)
 
-forward_min_attention_sharpness = 0.         # filter data with bad attention sharpness score, if 0 then no filter
+forward_min_attention_sharpness = 0.5         # filter data with bad attention sharpness score, if 0 then no filter
 forward_min_attention_alignment = 0.95         # filter data with bad attention alignment score, if 0 then no filter
 
 forward_max_mel_len = 1250              # if you have a couple of extremely long spectrograms you might want to use this
