@@ -207,7 +207,7 @@ def pad1d(x, max_len):
 
 
 def pad2d(x, max_len):
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.51, mode='constant')
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
 
 
 def collate_tts(batch, r):
