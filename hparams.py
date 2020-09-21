@@ -18,7 +18,7 @@ ignore_tts = False
 
 # Settings for all models
 sample_rate = 22050
-n_fft = 2048
+n_fft = 1024
 fft_bins = n_fft // 2 + 1
 num_mels = 80
 hop_length = 256                    # 12.5ms - in line with Tacotron 2 paper
