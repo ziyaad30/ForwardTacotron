@@ -118,7 +118,7 @@ class TacoTrainer:
             _, att_score = attention_score(attention, mel_lens)
             val_att_score += torch.mean(att_score).item()
 
-        return val_loss / len(val_set)
+        return val_loss / len(val_set), val_att_score / len(val_set)
 
     @ignore_exception
     def generate_plots(self, model: Tacotron, session: TTSSession) -> None:
