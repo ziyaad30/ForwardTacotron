@@ -4,6 +4,7 @@ import torch
 def attention_score(att, mel_lens, r=1):
     with torch.no_grad():
         device = att.device
+        mel_lens = mel_lens.to(device)
         b, t_max, c_max = att.size()
 
         # create mel padding mask
