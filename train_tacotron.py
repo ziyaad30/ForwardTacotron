@@ -49,6 +49,7 @@ def create_align_features(model: Tacotron,
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(val_set) + len(train_set)
     dataset = itertools.chain(train_set, val_set)
+    att_score_dict = {}
     for i, (x, mels, ids, mel_lens) in enumerate(dataset, 1):
         x, mels = x.to(device), mels.to(device)
         with torch.no_grad():
@@ -58,7 +59,6 @@ def create_align_features(model: Tacotron,
         argmax = np.argmax(attn[:, :, :], axis=2)
         mel_counts = np.zeros(shape=(bs, chars), dtype=np.int32)
         loc_score, sharp_score = attention_score(torch.tensor(attn), mel_lens, r=model.r)
-        att_score_dict = {}
         for b in range(attn.shape[0]):
             # fix random jumps in attention 
             for j in range(1, argmax.shape[1]):
@@ -71,9 +71,9 @@ def create_align_features(model: Tacotron,
         for j, item_id in enumerate(ids):
             np.save(str(save_path / f'{item_id}.npy'), mel_counts[j, :], allow_pickle=False)
         bar = progbar(i, iters)
-        pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
         msg = f'{bar} {i}/{iters} Batches '
         stream(msg)
+    pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
 
 
 if __name__ == '__main__':
