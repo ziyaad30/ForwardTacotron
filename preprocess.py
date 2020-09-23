@@ -96,12 +96,14 @@ else:
         message = f'{bar} {i}/{len(wav_files)} '
         stream(message)
 
+    dataset.sort()
     random = Random(hp.seed)
     random.shuffle(dataset)
     train_dataset = dataset[hp.n_val:]
     val_dataset = dataset[:hp.n_val]
     # sort val dataset longest to shortest
     val_dataset.sort(key=lambda d: -d[1])
+    print(f'first val sample: {val_dataset[0]}')
 
     for id, text in cleaned_texts:
         text_dict[id] = text
