@@ -7,8 +7,8 @@ data_path = 'data/'
 
 # model ids are separate - that way you can use a new tts with an old wavernn and vice versa
 # NB: expect undefined behaviour if models were trained on different DSP settings
-voc_model_id = 'asvoice_filter_2048_raw'
-tts_model_id = 'asvoice_filter_1024_2_tts'
+voc_model_id = 'ljspeech_raw'
+tts_model_id = 'ljspeech_tts'
 
 # set this to True if you are only interested in WaveRNN
 ignore_tts = False
@@ -18,7 +18,7 @@ ignore_tts = False
 
 # Settings for all models
 sample_rate = 22050
-n_fft = 2048
+n_fft = 1024
 fft_bins = n_fft // 2 + 1
 num_mels = 80
 hop_length = 256                    # 12.5ms - in line with Tacotron 2 paper
@@ -81,8 +81,8 @@ tts_lstm_dims = 512
 tts_postnet_K = 8
 tts_num_highways = 4
 tts_dropout = 0.5
-language = 'de'
-tts_cleaner_name = 'basic_cleaners'
+language = 'en-us'
+tts_cleaner_name = 'english_cleaners'
 tts_stop_threshold = -11           # Value below which audio generation ends.
                                     # For example, for a range of [-4, 4], this
                                     # will terminate the sequence at the first

@@ -70,7 +70,8 @@ def create_align_features(model: Tacotron,
         align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
         att_score_dict[item_id] = (align_score, sharp_score)
         durs = dur_extraction_func(seq, att, mel_len)
-        assert np.sum(durs) == mel_len, f'Sum of durations did not match mel length for item {item_id}'
+        if np.sum(durs) != mel_len:
+            print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         np.save(str(save_path / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
