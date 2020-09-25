@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
+from typing import Tuple
 
 from models.tacotron import Tacotron
 from trainer.common import Averager, TTSSession
@@ -103,7 +104,7 @@ class TacoTrainer:
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: Dataset) -> float:
+    def evaluate(self, model: Tacotron, val_set: Dataset) -> Tuple[float, float]:
         model.eval()
         val_loss = 0
         val_att_score = 0

@@ -2,6 +2,11 @@ import torch
 
 
 def attention_score(att, mel_lens, r=1):
+    """
+    Returns a tuple of scores (loc_score, sharp_score), where loc_score measures monotonicity and
+    sharp_score measures the sharpness of attention peaks
+    """
+
     with torch.no_grad():
         device = att.device
         mel_lens = mel_lens.to(device)
