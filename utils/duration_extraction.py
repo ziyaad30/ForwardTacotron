@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph._shortest_path import dijkstra
+from scipy.sparse.csgraph import dijkstra
 
 
 def to_node_index(i, j, cols):
