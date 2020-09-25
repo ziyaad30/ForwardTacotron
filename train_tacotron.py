@@ -61,14 +61,12 @@ def create_align_features(model: Tacotron,
         dur_extraction_func = extract_durations_per_count
 
     for i, (x, mels, ids, mel_lens) in enumerate(dataset, 1):
-        assert x.size(0) == 1, f'Batch size is supposed to be 1, was {x.size(0)}'
         x, mels = x.to(device), mels.to(device)
-        item_id = ids[0]
         with torch.no_grad():
             _, _, att_batch = model(x, mels)
         align_score, sharp_score = attention_score(att_batch, mel_lens, r=1)
         att_batch = np_now(att_batch)
-        seq, att, mel_len = x[0], att_batch[0], mel_lens[0]
+        seq, att, mel_len, item_id = x[0], att_batch[0], mel_lens[0], ids[0]
         align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
         att_score_dict[item_id] = (align_score, sharp_score)
         durs = dur_extraction_func(seq, att, mel_len)
