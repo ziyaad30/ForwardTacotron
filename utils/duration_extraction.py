@@ -86,6 +86,7 @@ def extract_durations_with_dijkstra(seq: np.array, att: np.array, mel_len: int) 
 def extract_durations_per_count(seq: np.array, att: np.array, mel_len: int) -> np.array:
     argmax = np.argmax(att[:, :], axis=1)
     durations = np.zeros(seq.shape[0], dtype=np.int32)
+    # fix random jumps in attention
     for j in range(1, argmax.shape[0]):
         if abs(argmax[j] - argmax[j - 1]) > 10:
             argmax[j] = argmax[j - 1]
