@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
+
 from models.tacotron import Tacotron
 from trainer.taco_trainer import TacoTrainer
 from utils import hparams as hp
@@ -12,6 +13,7 @@ from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import np_now
+from utils.duration_extraction import extract_durations_per_count, extract_durations_with_dijkstra
 from utils.files import pickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
@@ -50,26 +52,28 @@ def create_align_features(model: Tacotron,
     iters = len(val_set) + len(train_set)
     dataset = itertools.chain(train_set, val_set)
     att_score_dict = {}
-    for i, (x, mels, ids, mel_lens) in enumerate(dataset, 1):
-        x, mels = x.to(device), mels.to(device)
-        with torch.no_grad():
-            _, _, attn = model(x, mels)
-        attn = np_now(attn)
-        bs, chars = attn.shape[0], attn.shape[2]
-        argmax = np.argmax(attn[:, :, :], axis=2)
-        mel_counts = np.zeros(shape=(bs, chars), dtype=np.int32)
-        loc_score, sharp_score = attention_score(torch.tensor(attn), mel_lens, r=model.r)
-        for b in range(attn.shape[0]):
-            # fix random jumps in attention 
-            for j in range(1, argmax.shape[1]):
-                if abs(argmax[b, j] - argmax[b, j-1]) > 10:
-                    argmax[b, j] = argmax[b, j-1]
-            count = np.bincount(argmax[b, :mel_lens[b]])
-            mel_counts[b, :len(count)] = count[:len(count)]
-            att_score_dict[ids[b]] = (float(loc_score[b]), float(sharp_score[b]))
 
-        for j, item_id in enumerate(ids):
-            np.save(str(save_path / f'{item_id}.npy'), mel_counts[j, :], allow_pickle=False)
+    if hp.extract_durations_with_dijkstra:
+        print('Extracting durations using dijkstra...')
+        dur_extraction_func = extract_durations_with_dijkstra
+    else:
+        print('Extracting durations using attention peak counts...')
+        dur_extraction_func = extract_durations_per_count
+
+    for i, (x, mels, ids, mel_lens) in enumerate(dataset, 1):
+        assert x.size(0) == 1, f'Batch size is supposed to be 1, was {x.size(0)}'
+        x, mels = x.to(device), mels.to(device)
+        item_id = ids[0]
+        with torch.no_grad():
+            _, _, att_batch = model(x, mels)
+        align_score, sharp_score = attention_score(att_batch, mel_lens, r=1)
+        att_batch = np_now(att_batch)
+        seq, att, mel_len = x[0], att_batch[0], mel_lens[0]
+        align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
+        att_score_dict[item_id] = (align_score, sharp_score)
+        durs = dur_extraction_func(seq, att, mel_len)
+        print(durs)
+        np.save(str(save_path / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
         stream(msg)
@@ -132,7 +136,7 @@ if __name__ == '__main__':
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif force_align:
-        print('Creating Attention Alignments...\n')
+        print('Creating Attention Alignments...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r)
         create_align_features(model, train_set, val_set, paths.alg)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')

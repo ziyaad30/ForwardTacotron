@@ -8,7 +8,7 @@ data_path = 'data/'
 # model ids are separate - that way you can use a new tts with an old wavernn and vice versa
 # NB: expect undefined behaviour if models were trained on different DSP settings
 voc_model_id = 'asvoice_filter_2048_raw'
-tts_model_id = 'asvoice_filter_2048_tts'
+tts_model_id = 'asvoice_filter_1024_2_tts'
 
 # set this to True if you are only interested in WaveRNN
 ignore_tts = False
@@ -129,6 +129,7 @@ forward_max_mel_len = 1250              # if you have a couple of extremely long
 forward_clip_grad_norm = 1.0            # clips the gradient norm to prevent explosion - set to None if not needed
 forward_checkpoint_every = 10_000        # checkpoints the model every X steps
 forward_plot_every = 1000
+
 forward_min_attention_sharpness = 0.5         # filter data with bad attention sharpness score, if 0 then no filter
 forward_min_attention_alignment = 0.95         # filter data with bad attention alignment score, if 0 then no filter
 
