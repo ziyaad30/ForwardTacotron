@@ -72,7 +72,6 @@ def create_align_features(model: Tacotron,
         align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
         att_score_dict[item_id] = (align_score, sharp_score)
         durs = dur_extraction_func(seq, att, mel_len)
-        print(durs)
         np.save(str(save_path / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
