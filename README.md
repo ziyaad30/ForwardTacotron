@@ -19,7 +19,8 @@ does not use any attention. Hence, the required memory grows linearly with text 
 
 
 ## UPDATE (25.09.2020)
-Added an attention metric to monitor tacotron training that can be used to filter bad duration data.
+Added an attention metric to monitor tacotron training
+Attention metric can be used to filter bad duration extractions.
 More robust and precise duration extraction from attention alignments using dijkstra.
 
 ## 🔈 Samples
