@@ -11,15 +11,15 @@ def get_checkpoint_paths(checkpoint_type: str, paths: Paths):
         checkpoint_type: Either 'voc' or 'tts'
         paths: Paths object
     """
-    if checkpoint_type is 'tts':
+    if checkpoint_type == 'tts':
         weights_path = paths.tts_latest_weights
         optim_path = paths.tts_latest_optim
         checkpoint_path = paths.tts_checkpoints    
-    elif checkpoint_type is 'forward':
+    elif checkpoint_type == 'forward':
         weights_path = paths.forward_latest_weights
         optim_path = paths.forward_latest_optim
         checkpoint_path = paths.forward_checkpoints
-    elif checkpoint_type is 'voc':
+    elif checkpoint_type == 'voc':
         weights_path = paths.voc_latest_weights
         optim_path = paths.voc_latest_optim
         checkpoint_path = paths.voc_checkpoints

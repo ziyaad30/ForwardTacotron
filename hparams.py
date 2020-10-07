@@ -18,7 +18,7 @@ ignore_tts = False
 
 # Settings for all models
 sample_rate = 22050
-n_fft = 2048
+n_fft = 1024
 fft_bins = n_fft // 2 + 1
 num_mels = 80
 hop_length = 256                    # 12.5ms - in line with Tacotron 2 paper
@@ -65,6 +65,8 @@ voc_gen_batched = True              # very fast (realtime+) single utterance bat
 voc_target = 11_000                 # target number of samples to be generated in each batch entry
 voc_overlap = 550                   # number of samples for crossfading between batches
 
+# Duration Extraction from Attention
+extract_durations_with_dijkstra = True    # slower but much more robust than simply counting attention peaks
 
 
 # TACOTRON TTS -----------------------------------------------------------------------------------------------------#
@@ -127,6 +129,11 @@ forward_max_mel_len = 1250              # if you have a couple of extremely long
 forward_clip_grad_norm = 1.0            # clips the gradient norm to prevent explosion - set to None if not needed
 forward_checkpoint_every = 10_000        # checkpoints the model every X steps
 forward_plot_every = 1000
+
+forward_min_attention_sharpness = 0.5         # filter data with bad attention sharpness score, if 0 then no filter
+forward_min_attention_alignment = 0.95         # filter data with bad attention alignment score, if 0 then no filter
+
+
 
 # ------------------------------------------------------------------------------------------------------------------#
 

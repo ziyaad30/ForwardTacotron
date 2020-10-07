@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
+from typing import Tuple
 
 from models.tacotron import Tacotron
 from trainer.common import Averager, TTSSession
@@ -14,6 +15,7 @@ from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_attention
 from utils.dsp import reconstruct_waveform, np_now
+from utils.metrics import attention_score
 from utils.paths import Paths
 
 
@@ -52,7 +54,7 @@ class TacoTrainer:
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
         for e in range(1, epochs + 1):
-            for i, (x, m, ids, _) in enumerate(session.train_set, 1):
+            for i, (x, m, ids, mel_lens) in enumerate(session.train_set, 1):
                 start = time.time()
                 model.train()
                 x, m = x.to(device), m.to(device)
@@ -83,6 +85,9 @@ class TacoTrainer:
                 if step % hp.tts_plot_every == 0:
                     self.generate_plots(model, session)
 
+                _, att_score = attention_score(attention, mel_lens)
+                att_score = torch.mean(att_score)
+                self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Loss/train', loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
@@ -90,26 +95,31 @@ class TacoTrainer:
 
                 stream(msg)
 
-            val_loss = self.evaluate(model, session.val_set)
+            val_loss, val_att_score = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Loss/val', val_loss, model.get_step())
+            self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
             save_checkpoint('tts', self.paths, model, optimizer, is_silent=True)
 
             loss_avg.reset()
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: Dataset) -> float:
+    def evaluate(self, model: Tacotron, val_set: Dataset) -> Tuple[float, float]:
         model.eval()
         val_loss = 0
+        val_att_score = 0
         device = next(model.parameters()).device
-        for i, (x, m, ids, _) in enumerate(val_set, 1):
+        for i, (x, m, ids, mel_lens) in enumerate(val_set, 1):
             x, m = x.to(device), m.to(device)
             with torch.no_grad():
                 m1_hat, m2_hat, attention = model(x, m)
                 m1_loss = F.l1_loss(m1_hat, m)
                 m2_loss = F.l1_loss(m2_hat, m)
                 val_loss += m1_loss.item() + m2_loss.item()
-        return val_loss / len(val_set)
+            _, att_score = attention_score(attention, mel_lens)
+            val_att_score += torch.mean(att_score).item()
+
+        return val_loss / len(val_set), val_att_score / len(val_set)
 
     @ignore_exception
     def generate_plots(self, model: Tacotron, session: TTSSession) -> None:
