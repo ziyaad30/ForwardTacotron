@@ -101,6 +101,10 @@ def decode_mu_law(y, mu, from_labels=True):
 def np_now(x: torch.Tensor): return x.detach().cpu().numpy()
 
 
+def trim_silence(wav):
+    return librosa.effects.trim(wav, top_db=hp.trim_silence_top_db, frame_length=2048, hop_length=512)[0]
+
+
 def reconstruct_waveform(mel, n_iter=32):
     """Uses Griffin-Lim phase reconstruction to convert from a normalized
     mel spectrogram back into a waveform."""

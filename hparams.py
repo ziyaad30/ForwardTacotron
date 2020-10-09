@@ -28,7 +28,9 @@ fmax = 8000
 bits = 9                            # bit depth of signal
 mu_law = True                       # Recommended to suppress noise if using raw bits in hp.voc_mode below
 peak_norm = False                   # Normalise to the peak of each wav file
-
+trim_silence = True                 # Whether to trim start / end silence
+trim_silence_top_db = 60            # Threshold in decibels below reference to consider silence for for trimming
+                                    # start and end silences with librosa (no trimming if really high)
 
 # GENERAL TRAINING ----------------------------------------------------------------------------------------------------------#
 
