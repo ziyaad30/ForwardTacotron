@@ -145,6 +145,7 @@ Here is what the WaveRNN tensorboard looks like:
 * [https://github.com/fatchord/WaveRNN](https://github.com/fatchord/WaveRNN)
 * [https://github.com/seungwonpark/melgan](https://github.com/seungwonpark/melgan)
 * [https://github.com/xcmyz/LightSpeech](https://github.com/xcmyz/LightSpeech)
+* [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 
 ## Maintainers
 

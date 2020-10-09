@@ -1,7 +1,12 @@
 import math
+import struct
+
 import torch
 import numpy as np
 import librosa
+import webrtcvad
+from scipy.ndimage import binary_dilation
+
 from utils import hparams as hp
 from scipy.signal import lfilter
 
@@ -103,6 +108,30 @@ def np_now(x: torch.Tensor): return x.detach().cpu().numpy()
 
 def trim_silence(wav):
     return librosa.effects.trim(wav, top_db=hp.trim_silence_top_db, frame_length=2048, hop_length=512)[0]
+
+# from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/audio.py
+def trim_long_silences(wav):
+    int16_max = (2 ** 15) - 1
+    samples_per_window = (hp.vad_window_length * hp.vad_sample_rate) // 1000
+    wav = wav[:len(wav) - (len(wav) % samples_per_window)]
+    pcm_wave = struct.pack("%dh" % len(wav), *(np.round(wav * int16_max)).astype(np.int16))
+    voice_flags = []
+    vad = webrtcvad.Vad(mode=3)
+    for window_start in range(0, len(wav), samples_per_window):
+        window_end = window_start + samples_per_window
+        voice_flags.append(vad.is_speech(pcm_wave[window_start * 2:window_end * 2],
+                                         sample_rate=hp.vad_sample_rate))
+    voice_flags = np.array(voice_flags)
+    def moving_average(array, width):
+        array_padded = np.concatenate((np.zeros((width - 1) // 2), array, np.zeros(width // 2)))
+        ret = np.cumsum(array_padded, dtype=float)
+        ret[width:] = ret[width:] - ret[:-width]
+        return ret[width - 1:] / width
+    audio_mask = moving_average(voice_flags, hp.vad_moving_average_width)
+    audio_mask = np.round(audio_mask).astype(np.bool)
+    audio_mask[:] = binary_dilation(audio_mask[:], np.ones(hp.vad_max_silence_length + 1))
+    audio_mask = np.repeat(audio_mask, samples_per_window)
+    return wav[audio_mask]
 
 
 def reconstruct_waveform(mel, n_iter=32):
