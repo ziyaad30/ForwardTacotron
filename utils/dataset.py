@@ -113,7 +113,7 @@ def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
     val_data = filter_max_len(val_data)
     train_len_original = len(train_data)
 
-    if model_type == 'forward':
+    if model_type == 'forward' and hp.forward_filter_attention:
         attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
         train_data = filter_bad_attentions(train_data, attention_score_dict)
         val_data = filter_bad_attentions(val_data, attention_score_dict)

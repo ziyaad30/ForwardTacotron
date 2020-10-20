@@ -151,8 +151,9 @@ forward_clip_grad_norm = 1.0            # clips the gradient norm to prevent exp
 forward_checkpoint_every = 10_000        # checkpoints the model every X steps
 forward_plot_every = 1000
 
+forward_filter_attention = True               # whether to filter data with bad attention scores
 forward_min_attention_sharpness = 0.5         # filter data with bad attention sharpness score, if 0 then no filter
-forward_min_attention_alignment = 0.95         # filter data with bad attention alignment score, if 0 then no filter
+forward_min_attention_alignment = 0.95        # filter data with bad attention alignment score, if 0 then no filter
 
 
 
