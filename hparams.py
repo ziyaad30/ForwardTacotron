@@ -28,10 +28,11 @@ fmax = 8000
 bits = 9                            # bit depth of signal
 mu_law = True                       # Recommended to suppress noise if using raw bits in hp.voc_mode below
 peak_norm = False                   # Normalise to the peak of each wav file
-trim_start_end_silence = False       # Whether to trim leading and trailing silence
+trim_start_end_silence = False      # Whether to trim leading and trailing silence
 trim_silence_top_db = 60            # Threshold in decibels below reference to consider silence for for trimming
                                     # start and end silences with librosa (no trimming if really high)
-pitch_max_freq = 1250
+pitch_max_freq = 600                # Maximum value for pitch frequency to remove outliers (Common pitch range is
+                                    # about 60-300)
 
 # Params for trimming long silences, from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/hparams.py
 trim_long_silences = True            # Whether to reduce long silence using WebRTC Voice Activity Detector
