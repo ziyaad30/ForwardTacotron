@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
     parser.add_argument('--alpha', type=float, default=1., help='Parameter for controlling length regulator for speedup '
                                                                 'or slow-down of generated speech, e.g. alpha=2.0 is double-time')
+    parser.add_argument('--ampl', type=float, default=1., help='Parameter for controlling pitch amplification')
     parser.set_defaults(input_text=None)
     parser.set_defaults(weights_path=None)
 
@@ -102,6 +103,12 @@ if __name__ == '__main__':
                                 durpred_rnn_dims=hp.forward_durpred_rnn_dims,
                                 durpred_conv_dims=hp.forward_durpred_conv_dims,
                                 durpred_dropout=hp.forward_durpred_dropout,
+                                pitch_rnn_dims=hp.forward_pitch_rnn_dims,
+                                pitch_conv_dims=hp.forward_pitch_conv_dims,
+                                pitch_dropout=hp.forward_pitch_dropout,
+                                pitch_weight=hp.forward_pitch_weight,
+                                pitch_emb_dims=hp.forward_pitch_emb_dims,
+                                res_conv_dims=hp.forward_res_conv_dims,
                                 rnn_dim=hp.forward_rnn_dims,
                                 postnet_k=hp.forward_postnet_K,
                                 postnet_dims=hp.forward_postnet_dims,
@@ -145,7 +152,7 @@ if __name__ == '__main__':
     for i, x in enumerate(inputs, 1):
 
         print(f'\n| Generating {i}/{len(inputs)}')
-        _, m, _ = tts_model.generate(x, alpha=args.alpha)
+        _, m, dur, pitch = tts_model.generate(x, alpha=args.alpha, amplification=args.ampl)
 
         if args.vocoder == 'griffinlim':
             v_type = args.vocoder

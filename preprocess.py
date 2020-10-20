@@ -2,7 +2,7 @@ import argparse
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from random import Random
-import parselmouth
+import pyworld as pw
 from typing import Tuple, Dict
 
 from utils.display import *
@@ -44,9 +44,8 @@ class Preprocessor:
         if hp.peak_norm or peak > 1.0:
             y /= peak
         mel = melspectrogram(y)
-        snd = parselmouth.Sound(y, sampling_frequency=hp.sample_rate)
-        # TODO this only seems to work for sr=22050, make flexible
-        pitch = snd.to_pitch(time_step=snd.duration / (mel.shape[1] + 3)).selected_array['frequency']
+        pitch, _ = pw.dio(y.astype(np.float64), hp.sample_rate,
+                          frame_period=hp.hop_length / hp.sample_rate * 1000)
         if hp.voc_mode == 'RAW':
             quant = encode_mu_law(y, mu=2**hp.bits) if hp.mu_law else float_2_label(y, bits=hp.bits)
         elif hp.voc_mode == 'MOL':

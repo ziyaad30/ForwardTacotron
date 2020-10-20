@@ -8,7 +8,7 @@ data_path = 'data/'
 # model ids are separate - that way you can use a new tts with an old wavernn and vice versa
 # NB: expect undefined behaviour if models were trained on different DSP settings
 voc_model_id = 'ljspeech_raw'
-tts_model_id = 'ljspeech_tts'
+tts_model_id = 'asvoice2_pitch_concat_conv_tts'
 
 # set this to True if you are only interested in WaveRNN
 ignore_tts = False
@@ -31,6 +31,7 @@ peak_norm = False                   # Normalise to the peak of each wav file
 trim_start_end_silence = False       # Whether to trim leading and trailing silence
 trim_silence_top_db = 60            # Threshold in decibels below reference to consider silence for for trimming
                                     # start and end silences with librosa (no trimming if really high)
+pitch_max_freq = 1250
 
 # Params for trimming long silences, from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/hparams.py
 trim_long_silences = True            # Whether to reduce long silence using WebRTC Voice Activity Detector
@@ -91,8 +92,8 @@ tts_lstm_dims = 512
 tts_postnet_K = 8
 tts_num_highways = 4
 tts_dropout = 0.5
-language = 'en-us'
-tts_cleaner_name = 'english_cleaners'
+language = 'de'
+tts_cleaner_name = 'basic_cleaners'
 tts_stop_threshold = -11           # Value below which audio generation ends.
                                     # For example, for a range of [-4, 4], this
                                     # will terminate the sequence at the first
@@ -123,11 +124,21 @@ forward_postnet_dims = 256
 forward_durpred_conv_dims = 256
 forward_durpred_rnn_dims = 64
 forward_durpred_dropout = 0.5
+
+forward_pitch_conv_dims = 256
+forward_pitch_rnn_dims = 128
+forward_pitch_dropout = 0.5
+forward_pitch_emb_dims = 64
+forward_pitch_weight = 1.               # weights the pitch prediction, set to 0 if you want no pitch condition
+forward_res_conv_dims = 256
+
 forward_prenet_K = 16
 forward_postnet_K = 8
 forward_rnn_dims = 512
 forward_num_highways = 4
 forward_dropout = 0.1
+
+
 
 # Training
 

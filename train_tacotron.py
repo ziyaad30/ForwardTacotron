@@ -5,19 +5,62 @@ from pathlib import Path
 import torch
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
+from typing import Tuple
 
 from models.tacotron import Tacotron
 from trainer.taco_trainer import TacoTrainer
 from utils import hparams as hp
 from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_tts_datasets, filter_max_len
 from utils.display import *
 from utils.dsp import np_now
 from utils.duration_extraction import extract_durations_per_count, extract_durations_with_dijkstra
-from utils.files import pickle_binary
+from utils.files import pickle_binary, unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text import phonemes
+
+
+def normalize_pitch(phoneme_pitches):
+    nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
+                               for item_id, v in phoneme_pitches])
+    mean, std = np.mean(nonzeros), np.std(nonzeros)
+    for item_id, v in phoneme_pitches:
+        zero_idxs = np.where(v == 0.0)[0]
+        v -= mean
+        v /= std
+        v[zero_idxs] = 0.0
+    return mean, std
+
+
+# adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
+# 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
+def extract_pitch(save_path: Path) -> Tuple[float, float]:
+    train_data = unpickle_binary('data/train_dataset.pkl')
+    val_data = unpickle_binary('data/val_dataset.pkl')
+    all_data = filter_max_len(train_data + val_data)
+    phoneme_pitches = []
+    for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
+        dur = np.load(paths.alg / f'{item_id}.npy')
+        assert np.sum(dur) == mel_len
+        pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
+        durs_cum = np.cumsum(np.pad(dur, (1, 0)))
+        pitch_char = np.zeros((dur.shape[0],), dtype=np.float)
+        for idx, a, b in zip(range(mel_len), durs_cum[:-1], durs_cum[1:]):
+            values = pitch[a:b][np.where(pitch[a:b] != 0.0)[0]]
+            values = values[np.where(values < hp.pitch_max_freq)[0]]
+            pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
+        phoneme_pitches.append((item_id, pitch_char))
+        bar = progbar(prog_idx, len(all_data))
+        msg = f'{bar} {prog_idx}/{len(all_data)} Files '
+        stream(msg)
+
+    mean, var = normalize_pitch(phoneme_pitches)
+    for item_id, phoneme_pitch in phoneme_pitches:
+        np.save(str(save_path / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
+
+    print(f'\nPitch mean: {mean} var: {var}')
+    return mean, var
 
 
 def create_gta_features(model: Tacotron,
@@ -44,7 +87,8 @@ def create_gta_features(model: Tacotron,
 def create_align_features(model: Tacotron,
                           train_set: DataLoader,
                           val_set: DataLoader,
-                          save_path: Path):
+                          save_path_alg: Path,
+                          save_path_pitch: Path):
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
     model.eval()
@@ -72,11 +116,13 @@ def create_align_features(model: Tacotron,
         durs = dur_extraction_func(seq, att, mel_len)
         if np.sum(durs) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
-        np.save(str(save_path / f'{item_id}.npy'), durs, allow_pickle=False)
+        np.save(str(save_path_alg / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
         stream(msg)
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
+    print('Extracting Pitch Values...')
+    extract_pitch(save_path_pitch)
 
 
 if __name__ == '__main__':
@@ -86,15 +132,18 @@ if __name__ == '__main__':
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')
     parser.add_argument('--force_cpu', '-c', action='store_true', help='Forces CPU-only training, even when in CUDA capable environment')
+    parser.add_argument('--extract_pitch', '-p', action='store_true', help='Extracts phoneme-pitch values only')
     parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
     args = parser.parse_args()
 
     hp.configure(args.hp_file)  # Load hparams from file
     paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
 
-    force_train = args.force_train
-    force_gta = args.force_gta
-    force_align = args.force_align
+    if args.extract_pitch:
+        print('Extracting Pitch Values...')
+        mean, var = extract_pitch(paths.phon_pitch)
+        print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
+        exit()
 
     if not args.force_cpu and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -125,19 +174,18 @@ if __name__ == '__main__':
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f'Num Params: {params}')
-
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint('tts', paths, model, optimizer, create_if_missing=True, device=device)
 
-    if force_gta:
+    if args.force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
         train_set, val_set = get_tts_datasets(paths.data, 8, model.r)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
-    elif force_align:
-        print('Creating Attention Alignments...')
+    elif args.force_align:
+        print('Creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r)
-        create_align_features(model, train_set, val_set, paths.alg)
+        create_align_features(model, train_set, val_set, paths.alg, paths.phon_pitch)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths)

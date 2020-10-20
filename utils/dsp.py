@@ -109,6 +109,7 @@ def np_now(x: torch.Tensor): return x.detach().cpu().numpy()
 def trim_silence(wav):
     return librosa.effects.trim(wav, top_db=hp.trim_silence_top_db, frame_length=2048, hop_length=512)[0]
 
+
 # from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/audio.py
 def trim_long_silences(wav):
     int16_max = (2 ** 15) - 1

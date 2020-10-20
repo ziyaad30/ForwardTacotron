@@ -133,7 +133,10 @@ class ForwardTrainer:
                 pitch_val_loss += self.l1_loss(pitch_hat, pitch.unsqueeze(1), x_lens)
                 m_val_loss += m1_loss.item() + m2_loss.item()
                 dur_val_loss += dur_loss.item()
-        return m_val_loss / len(val_set), dur_val_loss / len(val_set), pitch_val_loss / len(val_set)
+        m_val_loss /= len(val_set)
+        dur_val_loss /= len(val_set)
+        pitch_val_loss /= len(val_set)
+        return m_val_loss, dur_val_loss, pitch_val_loss
 
     @ignore_exception
     def generate_plots(self, model: ForwardTacotron, session: TTSSession) -> None:
