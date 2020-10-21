@@ -113,7 +113,6 @@ class ForwardTacotron(nn.Module):
                  pitch_dropout,
                  pitch_emb_dims,
                  pitch_weight,
-                 res_conv_dims,
                  rnn_dim,
                  prenet_k,
                  prenet_dims,
@@ -139,9 +138,7 @@ class ForwardTacotron(nn.Module):
                            channels=prenet_dims,
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=highways)
-        self.res_conv = ConvResNet(2 * prenet_dims + pitch_emb_dims,
-                                   conv_dims=res_conv_dims)
-        self.lstm = nn.LSTM(res_conv_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims,
                             rnn_dim,
                             batch_first=True,
                             bidirectional=True)
@@ -178,7 +175,6 @@ class ForwardTacotron(nn.Module):
         for i in range(x.size(0)):
             x[i, mel_lens[i]:, :] = 0
 
-        x = self.res_conv(x)
         x, _ = self.lstm(x)
 
         x = F.dropout(x,
@@ -211,7 +207,7 @@ class ForwardTacotron(nn.Module):
         x = torch.cat([x, pitch_hat_proj * self.pitch_weight], dim=-1)
 
         x = self.lr(x, dur)
-        x = self.res_conv(x)
+
         x, _ = self.lstm(x)
         x = F.dropout(x,
                       p=self.dropout,

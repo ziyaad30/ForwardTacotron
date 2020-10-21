@@ -8,7 +8,7 @@ data_path = 'data/'
 # model ids are separate - that way you can use a new tts with an old wavernn and vice versa
 # NB: expect undefined behaviour if models were trained on different DSP settings
 voc_model_id = 'ljspeech_raw'
-tts_model_id = 'ljspeech_pitch_tts'
+tts_model_id = 'ljspeech_pitch_test_tts'
 
 # set this to True if you are only interested in WaveRNN
 ignore_tts = False
@@ -131,7 +131,6 @@ forward_pitch_rnn_dims = 128
 forward_pitch_dropout = 0.5
 forward_pitch_emb_dims = 64
 forward_pitch_weight = 1.               # weights the pitch prediction, set to 0 if you want no pitch condition
-forward_res_conv_dims = 256
 
 forward_prenet_K = 16
 forward_postnet_K = 8

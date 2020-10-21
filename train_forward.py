@@ -76,7 +76,6 @@ if __name__ == '__main__':
                             pitch_dropout=hp.forward_pitch_dropout,
                             pitch_weight=hp.forward_pitch_weight,
                             pitch_emb_dims=hp.forward_pitch_emb_dims,
-                            res_conv_dims=hp.forward_res_conv_dims,
                             rnn_dim=hp.forward_rnn_dims,
                             postnet_k=hp.forward_postnet_K,
                             postnet_dims=hp.forward_postnet_dims,
