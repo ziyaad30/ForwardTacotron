@@ -190,6 +190,10 @@ if __name__ == '__main__':
     else:
         trainer = TacoTrainer(paths)
         trainer.train(model, optimizer)
+        print('Creating Attention Alignments and Pitch Values...')
+        train_set, val_set = get_tts_datasets(paths.data, 1, model.r)
+        create_align_features(model, train_set, val_set, paths.alg, paths.phon_pitch)
+        print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 
 
 
