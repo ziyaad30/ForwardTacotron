@@ -104,7 +104,7 @@ def create_align_features(model: Tacotron,
         print('Extracting durations using attention peak counts...')
         dur_extraction_func = extract_durations_per_count
 
-    for i, (x, mels, ids, mel_lens) in enumerate(dataset, 1):
+    for i, (x, mels, ids, x_lens, mel_lens) in enumerate(dataset, 1):
         x, mels = x.to(device), mels.to(device)
         with torch.no_grad():
             _, _, att_batch = model(x, mels)
