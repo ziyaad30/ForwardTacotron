@@ -208,7 +208,6 @@ class ForwardTacotron(nn.Module):
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
-
         if self.pitch_emb_dims > 0:
             pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
             x = torch.cat([x, pitch_hat_proj], dim=-1)
