@@ -112,7 +112,7 @@ class ForwardTacotron(nn.Module):
                  pitch_rnn_dims,
                  pitch_dropout,
                  pitch_emb_dims,
-                 pitch_weight,
+                 pitch_proj_dropout,
                  rnn_dim,
                  prenet_k,
                  prenet_dims,
@@ -151,8 +151,11 @@ class ForwardTacotron(nn.Module):
                             num_highways=highways)
         self.dropout = dropout
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
-        self.pitch_proj = nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1)
-        self.pitch_weight = pitch_weight
+        self.pitch_emb_dims = pitch_emb_dims
+        if pitch_emb_dims > 0:
+            self.pitch_proj = nn.Sequential(
+                nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
+                nn.Dropout(pitch_proj_dropout))
 
     def forward(self, x, mel, dur, mel_lens, pitch):
         if self.training:
@@ -161,15 +164,15 @@ class ForwardTacotron(nn.Module):
         x = self.embedding(x)
         dur_hat = self.dur_pred(x).squeeze()
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
-
         pitch = pitch.unsqueeze(1)
-        pitch_proj = self.pitch_proj(pitch)
-        pitch_proj = pitch_proj.transpose(1, 2)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
-        x = torch.cat([x, pitch_proj * self.pitch_weight], dim=-1)
+        if self.pitch_emb_dims > 0:
+            pitch_proj = self.pitch_proj(pitch)
+            pitch_proj = pitch_proj.transpose(1, 2)
+            x = torch.cat([x, pitch_proj], dim=-1)
 
         x = self.lr(x, dur)
         for i in range(x.size(0)):
@@ -199,12 +202,15 @@ class ForwardTacotron(nn.Module):
         x = self.embedding(x)
         dur = self.dur_pred(x, alpha=alpha)
         dur = dur.squeeze(2)
-        pitch_hat = self.pitch_pred(x).transpose(1, 2) * amplification
-        pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
-        x = torch.cat([x, pitch_hat_proj * self.pitch_weight], dim=-1)
+
+        pitch_hat = self.pitch_pred(x).transpose(1, 2) * amplification
+
+        if self.pitch_emb_dims > 0:
+            pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
+            x = torch.cat([x, pitch_hat_proj], dim=-1)
 
         x = self.lr(x, dur)
 

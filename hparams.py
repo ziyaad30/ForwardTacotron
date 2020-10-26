@@ -8,7 +8,7 @@ data_path = 'data/'
 # model ids are separate - that way you can use a new tts with an old wavernn and vice versa
 # NB: expect undefined behaviour if models were trained on different DSP settings
 voc_model_id = 'ljspeech_raw'
-tts_model_id = 'ljspeech_pitch_concat_tts'
+tts_model_id = 'ljspeech_master_pitch_tts'
 
 # set this to True if you are only interested in WaveRNN
 ignore_tts = False
@@ -109,7 +109,7 @@ tts_schedule = [(10,  1e-3,  10_000,  32),   # progressive training schedule
 
 tts_max_mel_len = 1250              # if you have a couple of extremely long spectrograms you might want to use this
 tts_clip_grad_norm = 1.0            # clips the gradient norm to prevent explosion - set to None if not needed
-tts_checkpoint_every = 10_000        # checkpoints the model every X steps
+tts_checkpoint_every = 10_000       # checkpoints the model every X steps
 tts_plot_every = 1000
 
 # ------------------------------------------------------------------------------------------------------------------#
@@ -119,7 +119,7 @@ tts_plot_every = 1000
 
 
 # Model Hparams
-forward_embed_dims = 256                # embedding dimension for the graphemes/phoneme inputs
+forward_embed_dims = 256             # embedding dimension for the graphemes/phoneme inputs
 forward_prenet_dims = 256
 forward_postnet_dims = 256
 forward_durpred_conv_dims = 256
@@ -129,8 +129,8 @@ forward_durpred_dropout = 0.5
 forward_pitch_conv_dims = 256
 forward_pitch_rnn_dims = 128
 forward_pitch_dropout = 0.5
-forward_pitch_emb_dims = 64
-forward_pitch_weight = 1.               # weights the pitch prediction, set to 0 if you want no pitch condition
+forward_pitch_emb_dims = 0           # embedding dimension of pitch, set to 0 if you don't want pitch conditioning
+forward_pitch_proj_dropout = 0.5
 
 forward_prenet_K = 16
 forward_postnet_K = 8
