@@ -72,14 +72,14 @@ path = args.path
 
 if __name__ == '__main__':
 
-    all_wav_files = get_files(path, extension)
+    wav_files = get_files(path, extension)
     paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
-    print(f'\n{len(all_wav_files)} {extension[1:]} files found in "{path}"')
-    assert len(all_wav_files) > 0, f'Found no wav files in {path}, exiting.'
+    print(f'\n{len(wav_files)} {extension[1:]} files found in "{path}"')
+    assert len(wav_files) > 0, f'Found no wav files in {path}, exiting.'
 
-    raw_text_dict = ljspeech(path)
-    wav_files = {w for w in all_wav_files if w.stem in raw_text_dict}
-    text_dict = {item_id: text for item_id, text in raw_text_dict.items() if item_id in wav_files}
+    text_dict = ljspeech(path)
+    text_dict = {item_id: text for item_id, text in text_dict.items() if item_id in wav_files}
+    wav_files = {w for w in wav_files if w.stem in text_dict}
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
 
     n_workers = max(1, args.num_workers)
