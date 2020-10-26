@@ -130,7 +130,7 @@ forward_pitch_conv_dims = 256
 forward_pitch_rnn_dims = 128
 forward_pitch_dropout = 0.5
 forward_pitch_emb_dims = 64           # embedding dimension of pitch, set to 0 if you don't want pitch conditioning
-forward_pitch_proj_dropout = 0.5
+forward_pitch_proj_dropout = 0.1
 
 forward_prenet_K = 16
 forward_postnet_K = 8
