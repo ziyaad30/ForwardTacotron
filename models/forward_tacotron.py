@@ -203,10 +203,11 @@ class ForwardTacotron(nn.Module):
         dur = self.dur_pred(x, alpha=alpha)
         dur = dur.squeeze(2)
 
+        pitch_hat = self.pitch_pred(x).transpose(1, 2) * amplification
+
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
-        pitch_hat = self.pitch_pred(x).transpose(1, 2) * amplification
 
         if self.pitch_emb_dims > 0:
             pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
