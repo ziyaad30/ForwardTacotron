@@ -1,6 +1,4 @@
 import time
-import torch.nn.functional as F
-
 from typing import Tuple
 
 import torch
