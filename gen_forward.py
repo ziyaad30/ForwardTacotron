@@ -148,10 +148,13 @@ if __name__ == '__main__':
         simple_table([('Forward Tacotron', str(tts_k) + 'k'),
                     ('Vocoder Type', 'MelGAN')])
 
+    # simpla amplification of pitch
+    pitch_function = lambda x: x * args.amp
+
     for i, x in enumerate(inputs, 1):
 
         print(f'\n| Generating {i}/{len(inputs)}')
-        _, m, dur, pitch = tts_model.generate(x, alpha=args.alpha, amplification=args.amp)
+        _, m, dur, pitch = tts_model.generate(x, alpha=args.alpha, pitch_function=pitch_function)
 
         if args.vocoder == 'griffinlim':
             v_type = args.vocoder

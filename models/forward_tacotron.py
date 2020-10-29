@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, Callable, List
 
 import numpy as np
 
@@ -194,7 +194,10 @@ class ForwardTacotron(nn.Module):
         x = self.pad(x, mel.size(2))
         return x, x_post, dur_hat, pitch_hat
 
-    def generate(self, x, alpha=1.0, amplification=1.0):
+    def generate(self,
+                 x: List[int],
+                 alpha=1.0,
+                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> tuple:
         self.eval()
         device = next(self.parameters()).device  # use same device as parameters
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
@@ -203,7 +206,8 @@ class ForwardTacotron(nn.Module):
         dur = self.dur_pred(x, alpha=alpha)
         dur = dur.squeeze(2)
 
-        pitch_hat = self.pitch_pred(x).transpose(1, 2) * amplification
+        pitch_hat = self.pitch_pred(x).transpose(1, 2)
+        pitch_hat = pitch_function(pitch_hat)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
