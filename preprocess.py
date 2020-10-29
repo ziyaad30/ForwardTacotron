@@ -2,7 +2,7 @@ import argparse
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from random import Random
-
+import pyworld as pw
 from typing import Tuple, Dict
 
 from utils.display import *
@@ -29,31 +29,30 @@ class Preprocessor:
 
     def __call__(self, path: Path) -> Tuple[str, int, str]:
         wav_id = path.stem
-        m, x = self._convert_file(path)
+        m, x, raw_pitch = self._convert_file(path)
         np.save(self.paths.mel/f'{wav_id}.npy', m, allow_pickle=False)
         np.save(self.paths.quant/f'{wav_id}.npy', x, allow_pickle=False)
+        np.save(self.paths.raw_pitch/f'{wav_id}.npy', raw_pitch, allow_pickle=False)
         text = self.text_dict[wav_id]
         text = clean_text(text)
         return wav_id, m.shape[-1], text
 
-    def _convert_file(self, path: Path) -> Tuple[np.array, np.array]:
+    def _convert_file(self, path: Path) -> Tuple[np.array, np.array, np.array]:
         y = load_wav(path)
-        if hp.trim_long_silences:
-            y = trim_long_silences(y)
-        if hp.trim_start_end_silence:
-            y = trim_silence(y)
+        y = trim_silence(y)
         peak = np.abs(y).max()
         if hp.peak_norm or peak > 1.0:
             y /= peak
         mel = melspectrogram(y)
+        pitch, _ = pw.dio(y.astype(np.float64), hp.sample_rate,
+                          frame_period=hp.hop_length / hp.sample_rate * 1000)
         if hp.voc_mode == 'RAW':
             quant = encode_mu_law(y, mu=2**hp.bits) if hp.mu_law else float_2_label(y, bits=hp.bits)
         elif hp.voc_mode == 'MOL':
             quant = float_2_label(y, bits=16)
         else:
             raise ValueError(f'Unexpected voc mode {hp.voc_mode}, should be either RAW or MOL.')
-
-        return mel.astype(np.float32), quant.astype(np.int64)
+        return mel.astype(np.float32), quant.astype(np.int64), pitch.astype(np.float32)
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
@@ -74,11 +73,16 @@ path = args.path
 if __name__ == '__main__':
 
     wav_files = get_files(path, extension)
+    wav_ids = {w.stem for w in wav_files}
     paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
-    print(f'\n{len(wav_files)} {extension[1:]} files found in "{path}"\n')
+    print(f'\n{len(wav_files)} {extension[1:]} files found in "{path}"')
     assert len(wav_files) > 0, f'Found no wav files in {path}, exiting.'
 
     text_dict = ljspeech(path)
+    text_dict = {item_id: text for item_id, text in text_dict.items() if item_id in wav_ids}
+    wav_files = [w for w in wav_files if w.stem in text_dict]
+    print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
+
     n_workers = max(1, args.num_workers)
 
     simple_table([

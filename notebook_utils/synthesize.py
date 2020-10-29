@@ -1,4 +1,5 @@
 import torch
+from typing import Callable
 
 from models.fatchord_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
@@ -19,6 +20,11 @@ def get_forward_model(model_path):
                             durpred_rnn_dims=hp.forward_durpred_rnn_dims,
                             durpred_conv_dims=hp.forward_durpred_conv_dims,
                             durpred_dropout=hp.forward_durpred_dropout,
+                            pitch_rnn_dims=hp.forward_pitch_rnn_dims,
+                            pitch_conv_dims=hp.forward_pitch_conv_dims,
+                            pitch_dropout=hp.forward_pitch_dropout,
+                            pitch_emb_dims=hp.forward_pitch_emb_dims,
+                            pitch_proj_dropout=hp.forward_pitch_proj_dropout,
                             rnn_dim=hp.forward_rnn_dims,
                             postnet_k=hp.forward_postnet_K,
                             postnet_dims=hp.forward_postnet_dims,
@@ -57,10 +63,14 @@ def get_melgan_model():
     return vocoder
 
 
-def synthesize(input_text, tts_model, voc_model, alpha=1.0):
+def synthesize(input_text: str,
+               tts_model: ForwardTacotron,
+               voc_model: torch.nn.Module,
+               alpha=1.0,
+               pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x):
     text = clean_text(input_text.strip())
     x = text_to_sequence(text)
-    _, m, _ = tts_model.generate(x, alpha=alpha)
+    _, m, _, _ = tts_model.generate(x, alpha=alpha, pitch_function=pitch_function)
     if voc_model == 'griffinlim':
         wav = reconstruct_waveform(m, n_iter=32)
     elif isinstance(voc_model, WaveRNN):
