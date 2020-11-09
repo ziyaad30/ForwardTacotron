@@ -1,6 +1,6 @@
 from phonemizer.phonemize import phonemize
 from utils import hparams as hp
-
+from utils.text.symbols import phonemes_set
 
 """ from https://github.com/keithito/tacotron """
 
@@ -96,4 +96,5 @@ def to_phonemes(text):
                          punctuation_marks=';:,.!?¡¿—…"«»“”()',
                          language_switch='remove-flags')
     phonemes = phonemes.replace('—', '-')
+    phonemes = ''.join([p for p in phonemes if p in phonemes_set])
     return phonemes
