@@ -72,6 +72,7 @@ def convert_to_ascii(text):
 def basic_cleaners(text):
   text = to_phonemes(text)
   text = collapse_whitespace(text)
+  text = text.strip()
   return text
 
 
@@ -81,6 +82,7 @@ def english_cleaners(text):
   text = expand_abbreviations(text)
   text = to_phonemes(text)
   text = collapse_whitespace(text)
+  text = text.strip()
   return text
 
 
