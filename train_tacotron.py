@@ -36,8 +36,8 @@ def normalize_pitch(phoneme_pitches):
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
 def extract_pitch(save_path: Path) -> Tuple[float, float]:
-    train_data = unpickle_binary('data/train_dataset.pkl')
-    val_data = unpickle_binary('data/val_dataset.pkl')
+    train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
+    val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
     all_data = filter_max_len(train_data + val_data)
     phoneme_pitches = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
