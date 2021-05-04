@@ -1,21 +1,15 @@
-import time
+import numpy as np
+import argparse
+
 import numpy as np
 import torch
 from torch import optim
-import torch.nn.functional as F
 
-from trainer.voc_trainer import VocTrainer
-from utils.display import stream, simple_table
-from utils.dataset import get_vocoder_datasets
-from utils.distribution import discretized_mix_logistic_loss
-from utils import hparams as hp
 from models.fatchord_version import WaveRNN
-from gen_wavernn import gen_testset
+from trainer.voc_trainer import VocTrainer
+from utils import hparams as hp
+from utils.checkpoints import restore_checkpoint
 from utils.paths import Paths
-import argparse
-from utils import data_parallel_workaround
-from utils.checkpoints import save_checkpoint, restore_checkpoint
-
 
 if __name__ == '__main__':
 

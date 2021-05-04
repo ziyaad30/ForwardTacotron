@@ -1,11 +1,11 @@
 import argparse
 import itertools
 from pathlib import Path
+from typing import Tuple
 
 import torch
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
-from typing import Tuple
 
 from models.tacotron import Tacotron
 from trainer.taco_trainer import TacoTrainer
@@ -88,7 +88,7 @@ def create_align_features(model: Tacotron,
                           train_set: DataLoader,
                           val_set: DataLoader,
                           save_path_alg: Path,
-                          save_path_pitch: Path):
+                          save_path_pitch: Path) -> None:
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
     model.eval()
@@ -131,12 +131,11 @@ if __name__ == '__main__':
     parser.add_argument('--force_train', '-f', action='store_true', help='Forces the model to train past total steps')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')
-    parser.add_argument('--force_cpu', '-c', action='store_true', help='Forces CPU-only training, even when in CUDA capable environment')
     parser.add_argument('--extract_pitch', '-p', action='store_true', help='Extracts phoneme-pitch values only')
     parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
     args = parser.parse_args()
 
-    hp.configure(args.hp_file)  # Load hparams from file
+    hp.configure(args.hp_file)
     paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
 
     if args.extract_pitch:
@@ -145,14 +144,7 @@ if __name__ == '__main__':
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 
-    if not args.force_cpu and torch.cuda.is_available():
-        device = torch.device('cuda')
-        for session in hp.tts_schedule:
-            _, _, _, batch_size = session
-            if batch_size % torch.cuda.device_count() != 0:
-                raise ValueError('`batch_size` must be evenly divisible by n_gpus!')
-    else:
-        device = torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Tacotron Model
@@ -179,7 +171,7 @@ if __name__ == '__main__':
 
     if args.force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
-        train_set, val_set = get_tts_datasets(paths.data, 8, model.r)
+        train_set, val_set = get_tts_datasets(paths.data, 1, model.r)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif args.force_align:

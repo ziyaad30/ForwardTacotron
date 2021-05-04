@@ -1,11 +1,13 @@
-from utils.dataset import get_vocoder_datasets
-from utils.dsp import *
-from models.fatchord_version import WaveRNN
-from utils.paths import Paths
-from utils.display import simple_table
-import torch
 import argparse
 from pathlib import Path
+
+import torch
+
+from models.fatchord_version import WaveRNN
+from utils.dataset import get_vocoder_datasets
+from utils.display import simple_table
+from utils.dsp import *
+from utils.paths import Paths
 
 
 def gen_testset(model: WaveRNN, test_set, samples, batched, target, overlap, save_path: Path):

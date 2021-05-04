@@ -1,14 +1,15 @@
+import argparse
+
 import torch
 
 from models.fatchord_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
 from utils import hparams as hp
-from utils.text.symbols import phonemes
-from utils.paths import Paths
-import argparse
-from utils.text import text_to_sequence, clean_text
 from utils.display import simple_table
 from utils.dsp import reconstruct_waveform, save_wav
+from utils.paths import Paths
+from utils.text import text_to_sequence, clean_text
+from utils.text.symbols import phonemes
 
 if __name__ == '__main__':
 

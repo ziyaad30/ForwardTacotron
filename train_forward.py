@@ -1,8 +1,8 @@
 import argparse
 import itertools
+import os
 from pathlib import Path
 
-import os
 import torch
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
@@ -21,7 +21,7 @@ from utils.text.symbols import phonemes
 def create_gta_features(model: Tacotron,
                         train_set: DataLoader,
                         val_set: DataLoader,
-                        save_path: Path):
+                        save_path: Path) -> None:
     model.eval()
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(train_set) + len(val_set)
@@ -45,7 +45,6 @@ if __name__ == '__main__':
     # Parse Arguments
     parser = argparse.ArgumentParser(description='Train Tacotron TTS')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
-    parser.add_argument('--force_cpu', '-c', action='store_true', help='Forces CPU-only training, even when in CUDA capable environment')
     parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
     args = parser.parse_args()
 
@@ -56,15 +55,7 @@ if __name__ == '__main__':
                                            f'alignments first with python train_tacotron.py --force_align!'
 
     force_gta = args.force_gta
-
-    if not args.force_cpu and torch.cuda.is_available():
-        device = torch.device('cuda')
-        for session in hp.forward_schedule:
-            _, _, batch_size = session
-            if batch_size % torch.cuda.device_count() != 0:
-                raise ValueError('`batch_size` must be evenly divisible by n_gpus!')
-    else:
-        device = torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Forward TTS Model

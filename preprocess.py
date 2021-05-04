@@ -2,8 +2,9 @@ import argparse
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from random import Random
-import pyworld as pw
 from typing import Tuple, Dict
+
+import pyworld as pw
 
 from utils.display import *
 from utils.dsp import *
