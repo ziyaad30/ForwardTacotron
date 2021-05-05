@@ -59,11 +59,7 @@ class ForwardTrainer:
                 start = time.time()
                 model.train()
 
-                pred = model(x=batch['x'],
-                             m=batch['mel'],
-                             dur=batch['dur'],
-                             mel_lens=batch['mel_len'],
-                             pitch=batch['pitch'])
+                pred = model(batch)
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
@@ -76,6 +72,7 @@ class ForwardTrainer:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), hp.tts_clip_grad_norm)
                 optimizer.step()
+                
                 m_loss_avg.add(m1_loss.item() + m2_loss.item())
                 dur_loss_avg.add(dur_loss.item())
                 step = model.get_step()
