@@ -72,7 +72,7 @@ class ForwardTrainer:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), hp.tts_clip_grad_norm)
                 optimizer.step()
-                
+
                 m_loss_avg.add(m1_loss.item() + m2_loss.item())
                 dur_loss_avg.add(dur_loss.item())
                 step = model.get_step()
@@ -169,7 +169,7 @@ class ForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=hp.sample_rate)
 
-        m1_hat, m2_hat, dur_hat, pitch_hat = model.generate(batch['x'][0, :batch['xlen'][0]].tolist())
+        m1_hat, m2_hat, dur_hat, pitch_hat = model.generate(batch['x'][0, :batch['x_len'][0]].tolist())
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
