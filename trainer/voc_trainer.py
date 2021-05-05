@@ -128,7 +128,7 @@ class VocTrainer:
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
-            x, m, y = batch['x'], batch['y'], batch['mel']
+            x, y, m = batch['x'], batch['y'], batch['mel']
             with torch.no_grad():
                 y_hat = model(x, m)
                 if model.mode == 'RAW':

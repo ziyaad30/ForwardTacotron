@@ -103,24 +103,24 @@ class BatchNormConv(nn.Module):
 class ForwardTacotron(nn.Module):
 
     def __init__(self,
-                 embed_dims,
-                 num_chars,
-                 durpred_conv_dims,
-                 durpred_rnn_dims,
-                 durpred_dropout,
-                 pitch_conv_dims,
-                 pitch_rnn_dims,
-                 pitch_dropout,
-                 pitch_emb_dims,
-                 pitch_proj_dropout,
-                 rnn_dim,
-                 prenet_k,
-                 prenet_dims,
-                 postnet_k,
-                 postnet_dims,
-                 highways,
-                 dropout,
-                 n_mels):
+                 embed_dims: int,
+                 num_chars: int,
+                 durpred_conv_dims: int,
+                 durpred_rnn_dims: int,
+                 durpred_dropout: float,
+                 pitch_conv_dims: int,
+                 pitch_rnn_dims: int,
+                 pitch_dropout: float,
+                 pitch_emb_dims: int,
+                 pitch_proj_dropout: float,
+                 rnn_dim: int,
+                 prenet_k: int,
+                 prenet_dims: int,
+                 postnet_k: int,
+                 postnet_dims: int,
+                 highways: int,
+                 dropout: float,
+                 n_mels: int):
         super().__init__()
         self.rnn_dim = rnn_dim
         self.embedding = nn.Embedding(num_chars, embed_dims)
