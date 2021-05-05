@@ -55,7 +55,7 @@ class ForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
-                batch = to_device(batch)
+                batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
 
