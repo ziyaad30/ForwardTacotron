@@ -7,7 +7,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1
+from trainer.common import Averager, TTSSession, MaskedL1, to_device
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
@@ -54,20 +54,22 @@ class ForwardTrainer:
         pitch_loss_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
         for e in range(1, epochs + 1):
-            for i, (x, m, ids, x_lens, mel_lens, dur, pitch) in enumerate(session.train_set, 1):
-
+            for i, batch in enumerate(session.train_set, 1):
+                batch = to_device(batch)
                 start = time.time()
                 model.train()
-                x, m, dur, x_lens, mel_lens, pitch = x.to(device), m.to(device), dur.to(device),\
-                                                     x_lens.to(device), mel_lens.to(device), pitch.to(device)
 
-                m1_hat, m2_hat, dur_hat, pitch_hat = model(x, m, dur, mel_lens, pitch)
+                pred = model(x=batch['x'],
+                             m=batch['mel'],
+                             dur=batch['dur'],
+                             mel_lens=batch['mel_len'],
+                             pitch=batch['pitch'])
 
-                m1_loss = self.l1_loss(m1_hat, m, mel_lens)
-                m2_loss = self.l1_loss(m2_hat, m, mel_lens)
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), dur.unsqueeze(1), x_lens)
-                pitch_loss = self.l1_loss(pitch_hat, pitch.unsqueeze(1), x_lens)
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss + 0.1 * dur_loss + 0.1 * pitch_loss
                 optimizer.zero_grad()
@@ -120,15 +122,15 @@ class ForwardTrainer:
         dur_val_loss = 0
         pitch_val_loss = 0
         device = next(model.parameters()).device
-        for i, (x, m, ids, x_lens, mel_lens, dur, pitch) in enumerate(val_set, 1):
-            x, m, dur, x_lens, mel_lens, pitch = x.to(device), m.to(device), dur.to(device), \
-                                                 x_lens.to(device), mel_lens.to(device), pitch.to(device)
+        for i, batch in enumerate(val_set, 1):
+            batch = to_device(batch, device=device)
             with torch.no_grad():
-                m1_hat, m2_hat, dur_hat, pitch_hat = model(x, m, dur, mel_lens, pitch)
-                m1_loss = self.l1_loss(m1_hat, m, mel_lens)
-                m2_loss = self.l1_loss(m2_hat, m, mel_lens)
-                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), dur.unsqueeze(1), x_lens)
-                pitch_val_loss += self.l1_loss(pitch_hat, pitch.unsqueeze(1), x_lens)
+                pred = model(batch)
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
+                pitch_val_loss += pitch_loss
                 m_val_loss += m1_loss.item() + m2_loss.item()
                 dur_val_loss += dur_loss.item()
         m_val_loss /= len(val_set)
@@ -140,28 +142,28 @@ class ForwardTrainer:
     def generate_plots(self, model: ForwardTacotron, session: TTSSession) -> None:
         model.eval()
         device = next(model.parameters()).device
-        x, m, ids, x_lens, mel_lens, dur, pitch = session.val_sample
-        x, m, dur, mel_lens, pitch = x.to(device), m.to(device), dur.to(device), mel_lens.to(device), pitch.to(device)
+        batch = session.val_sample
+        batch = to_device(batch, device=device)
 
-        m1_hat, m2_hat, dur_hat, pitch_hat = model(x, m, dur, mel_lens, pitch)
-        m1_hat = np_now(m1_hat)[0, :600, :]
-        m2_hat = np_now(m2_hat)[0, :600, :]
-        m = np_now(m)[0, :600, :]
+        pred = model(batch)
+        m1_hat = np_now(pred['mel'])[0, :600, :]
+        m2_hat = np_now(pred['mel_post'])[0, :600, :]
+        m_target = np_now(batch['mel'])[0, :600, :]
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
-        m_fig = plot_mel(m)
-        pitch_fig = plot_pitch(np_now(pitch[0]))
-        pitch_gta_fig = plot_pitch(np_now(pitch_hat.squeeze()[0]))
+        m_target_fig = plot_mel(m_target)
+        pitch_fig = plot_pitch(np_now(batch['pitch'][0]))
+        pitch_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
 
         self.writer.add_figure('Pitch/target', pitch_fig, model.step)
         self.writer.add_figure('Pitch/ground_truth_aligned', pitch_gta_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/target', m_fig, model.step)
+        self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
         m2_hat_wav = reconstruct_waveform(m2_hat)
-        target_wav = reconstruct_waveform(m)
+        target_wav = reconstruct_waveform(m_target)
 
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
@@ -170,14 +172,14 @@ class ForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=hp.sample_rate)
 
-        m1_hat, m2_hat, dur_hat, pitch_hat = model.generate(x[0, :x_lens[0]].tolist())
+        m1_hat, m2_hat, dur_hat, pitch_hat = model.generate(batch['x'][0, :batch['xlen'][0]].tolist())
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
         pitch_gen_fig = plot_pitch(np_now(pitch_hat.squeeze()))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)
-        self.writer.add_figure('Generated/target', m_fig, model.step)
+        self.writer.add_figure('Generated/target', m_target_fig, model.step)
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
 

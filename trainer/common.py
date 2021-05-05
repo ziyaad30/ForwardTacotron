@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch
 import torch.nn.functional as F
 from torch.utils.data.dataloader import DataLoader
@@ -13,6 +15,8 @@ class TTSSession:
                  bs: int,
                  train_set: DataLoader,
                  val_set: DataLoader) -> None:
+        """ Container for TTS training variables. """
+
         self.index = index
         self.r = r
         self.lr = lr
@@ -33,6 +37,8 @@ class VocSession:
                  train_set: DataLoader,
                  val_set: list,
                  val_set_samples: list) -> None:
+        """ Container for WaveRNN training variables. """
+
         self.index = index
         self.lr = lr
         self.max_step = max_step
@@ -44,20 +50,20 @@ class VocSession:
 
 class Averager:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.count = 0
         self.val = 0.
 
-    def add(self, val):
+    def add(self, val: float) -> None:
         self.val += float(val)
         self.count += 1
 
-    def reset(self):
+    def reset(self) -> None:
         self.val = 0.
         self.count = 0
 
-    def get(self):
-        return self.val / self.count
+    def get(self) -> float:
+        return self.val / self.count if self.count > 0. else 0.
 
 
 class MaskedL1(torch.nn.Module):
@@ -84,3 +90,12 @@ def pad_mask(lens, max_len):
     lens = lens.expand_as(seq_range)
     mask = seq_range < lens
     return mask.float()
+
+
+def to_device(batch: Dict[str, torch.tensor],
+              device: torch.device) -> Dict[str, torch.tensor]:
+    output = {}
+    for key, val in batch.items():
+        val = val.to(device) if torch.is_tensor(val) else val
+        output[key] = val
+    return output

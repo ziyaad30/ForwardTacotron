@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple
 
 from models.tacotron import Tacotron
-from trainer.common import Averager, TTSSession
+from trainer.common import Averager, TTSSession, to_device
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
@@ -54,15 +54,14 @@ class TacoTrainer:
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
         for e in range(1, epochs + 1):
-            for i, (x, m, ids, x_lens, mel_lens) in enumerate(session.train_set, 1):
+            for i, batch in enumerate(session.train_set, 1):
+                batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
-                x, m = x.to(device), m.to(device)
+                m1_hat, m2_hat, attention = model(batch['x'], batch['mel'])
 
-                m1_hat, m2_hat, attention = model(x, m)
-
-                m1_loss = F.l1_loss(m1_hat, m)
-                m2_loss = F.l1_loss(m2_hat, m)
+                m1_loss = F.l1_loss(m1_hat, batch['mel'])
+                m2_loss = F.l1_loss(m2_hat, batch['mel'])
                 loss = m1_loss + m2_loss
                 optimizer.zero_grad()
                 loss.backward()
@@ -85,7 +84,7 @@ class TacoTrainer:
                 if step % hp.tts_plot_every == 0:
                     self.generate_plots(model, session)
 
-                _, att_score = attention_score(attention, mel_lens)
+                _, att_score = attention_score(attention, batch['mel_len'])
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Loss/train', loss, model.get_step())
@@ -109,14 +108,14 @@ class TacoTrainer:
         val_loss = 0
         val_att_score = 0
         device = next(model.parameters()).device
-        for i, (x, m, ids, x_lens, mel_lens) in enumerate(val_set, 1):
-            x, m = x.to(device), m.to(device)
+        for i, batch in enumerate(val_set, 1):
+            batch = to_device(batch, device=device)
             with torch.no_grad():
-                m1_hat, m2_hat, attention = model(x, m)
-                m1_loss = F.l1_loss(m1_hat, m)
-                m2_loss = F.l1_loss(m2_hat, m)
+                m1_hat, m2_hat, attention = model(batch['x'], batch['mel'])
+                m1_loss = F.l1_loss(m1_hat, batch['mel'])
+                m2_loss = F.l1_loss(m2_hat, batch['mel'])
                 val_loss += m1_loss.item() + m2_loss.item()
-            _, att_score = attention_score(attention, mel_lens)
+            _, att_score = attention_score(attention, batch['mel_len'])
             val_att_score += torch.mean(att_score).item()
 
         return val_loss / len(val_set), val_att_score / len(val_set)
@@ -125,27 +124,26 @@ class TacoTrainer:
     def generate_plots(self, model: Tacotron, session: TTSSession) -> None:
         model.eval()
         device = next(model.parameters()).device
-        x, m, ids, x_lens, m_lens = session.val_sample
-        x, m = x.to(device), m.to(device)
-
-        m1_hat, m2_hat, att = model(x, m)
+        batch = session.val_sample
+        batch = to_device(batch, device=device)
+        m1_hat, m2_hat, att = model(batch['x'], batch['mel'])
         att = np_now(att)[0]
         m1_hat = np_now(m1_hat)[0, :600, :]
         m2_hat = np_now(m2_hat)[0, :600, :]
-        m = np_now(m)[0, :600, :]
+        m_target = np_now(batch['mel'])[0, :600, :]
 
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
-        m_fig = plot_mel(m)
+        m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure('Ground_Truth_Aligned/attention', att_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/target', m_fig, model.step)
+        self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
         m2_hat_wav = reconstruct_waveform(m2_hat)
-        target_wav = reconstruct_waveform(m)
+        target_wav = reconstruct_waveform(m_target)
 
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
@@ -154,13 +152,13 @@ class TacoTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=hp.sample_rate)
 
-        m1_hat, m2_hat, att = model.generate(x[0].tolist(), steps=m_lens[0] + 20)
+        m1_hat, m2_hat, att = model.generate(batch['x'][0].tolist(), steps=batch['mel_len'][0] + 20)
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
         self.writer.add_figure('Generated/attention', att_fig, model.step)
-        self.writer.add_figure('Generated/target', m_fig, model.step)
+        self.writer.add_figure('Generated/target', m_target_fig, model.step)
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
 

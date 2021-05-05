@@ -1,8 +1,11 @@
+from pathlib import Path
+from typing import Tuple
+
 import torch
 from utils.paths import Paths
 
 
-def get_checkpoint_paths(checkpoint_type: str, paths: Paths):
+def get_checkpoint_paths(checkpoint_type: str, paths: Paths) -> Tuple[Path, Path, Path]:
     """
     Returns the correct checkpointing paths
     depending on whether model is Vocoder or TTS

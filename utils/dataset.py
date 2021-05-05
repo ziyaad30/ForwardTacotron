@@ -1,6 +1,6 @@
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from utils.dsp import *
 from utils import hparams as hp
@@ -21,12 +21,11 @@ class VocoderDataset(Dataset):
         self.mel_path = path/'gta' if train_gta else path/'mel'
         self.quant_path = path/'quant'
 
-
     def __getitem__(self, index):
         item_id = self.metadata[index]
-        m = np.load(self.mel_path/f'{item_id}.npy')
+        mel = np.load(self.mel_path/f'{item_id}.npy')
         x = np.load(self.quant_path/f'{item_id}.npy')
-        return m, x
+        return {'mel': mel, 'x': x}
 
     def __len__(self):
         return len(self.metadata)
@@ -70,20 +69,20 @@ def get_vocoder_datasets(path: Path, batch_size, train_gta):
     return train_set, val_set, val_set_samples
 
 
-def collate_vocoder(batch):
+def collate_vocoder(batch: List[Dict[str, torch.tensor]]):
     mel_win = hp.voc_seq_len // hp.hop_length + 2 * hp.voc_pad
-    max_offsets = [x[0].shape[-1] -2 - (mel_win + 2 * hp.voc_pad) for x in batch]
+    max_offsets = [b['mel'].shape[-1] -2 - (mel_win + 2 * hp.voc_pad) for b in batch]
     mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
     sig_offsets = [(offset + hp.voc_pad) * hp.hop_length for offset in mel_offsets]
 
-    mels = [x[0][:, mel_offsets[i]:mel_offsets[i] + mel_win] for i, x in enumerate(batch)]
+    mels = [b['mel'][:, mel_offsets[i]:mel_offsets[i] + mel_win] for i, b in enumerate(batch)]
 
-    labels = [x[1][sig_offsets[i]:sig_offsets[i] + hp.voc_seq_len + 1] for i, x in enumerate(batch)]
+    labels = [b['x'][sig_offsets[i]:sig_offsets[i] + hp.voc_seq_len + 1] for i, b in enumerate(batch)]
 
     mels = np.stack(mels).astype(np.float32)
     labels = np.stack(labels).astype(np.int64)
 
-    mels = torch.tensor(mels)
+    mel = torch.tensor(mels)
     labels = torch.tensor(labels).long()
 
     x = labels[:, :hp.voc_seq_len]
@@ -96,7 +95,7 @@ def collate_vocoder(batch):
     if hp.voc_mode == 'MOL':
         y = label_2_float(y.float(), bits)
 
-    return x, y, mels
+    return {'mel': mel, 'x': x, 'y': y}
 
 
 ###################################################################################
@@ -163,25 +162,30 @@ def filter_bad_attentions(dataset: List[tuple], attention_score_dict: Dict[str, 
     dataset_filtered = []
     for item_id, mel_len in dataset:
         align_score, sharp_score = attention_score_dict[item_id]
-        if align_score > hp.forward_min_attention_alignment and sharp_score > hp.forward_min_attention_sharpness:
+        if align_score > hp.forward_min_attention_alignment \
+                and sharp_score > hp.forward_min_attention_sharpness:
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 
 
 class TacoDataset(Dataset):
 
-    def __init__(self, path: Path, dataset_ids, text_dict):
+    def __init__(self,
+                 path: Path,
+                 dataset_ids: List[str],
+                 text_dict: Dict[str, str]) -> None:
         self.path = path
         self.metadata = dataset_ids
         self.text_dict = text_dict
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
         x = text_to_sequence(text)
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
-        return x, mel, item_id, mel_len
+        return {'x': x, 'mel': mel, 'item_id': item_id,
+                'mel_len': mel_len, 'x_len': len(x)}
 
     def __len__(self):
         return len(self.metadata)
@@ -189,12 +193,15 @@ class TacoDataset(Dataset):
 
 class ForwardDataset(Dataset):
 
-    def __init__(self, path: Path, dataset_ids, text_dict):
+    def __init__(self,
+                 path: Path,
+                 dataset_ids: List[str],
+                 text_dict: Dict[str, str]):
         self.path = path
         self.metadata = dataset_ids
         self.text_dict = text_dict
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
         x = text_to_sequence(text)
@@ -202,7 +209,8 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
-        return x, mel, item_id, mel_len, dur, pitch
+        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch}
 
     def __len__(self):
         return len(self.metadata)
@@ -216,34 +224,36 @@ def pad2d(x, max_len):
     return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
 
 
-def collate_tts(batch, r):
-    x_lens = [len(x[0]) for x in batch]
-    max_x_len = max(x_lens)
-    chars = [pad1d(x[0], max_x_len) for x in batch]
-    chars = np.stack(chars)
-    spec_lens = [x[1].shape[-1] for x in batch]
+def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dict[str, torch.tensor]:
+    x_len = [b['x_len'] for b in batch]
+    x_len = torch.tensor(x_len)
+    max_x_len = max(x_len)
+    text = [pad1d(b['x'], max_x_len) for b in batch]
+    text = np.stack(text)
+    text = torch.tensor(text).long()
+    spec_lens = [b['mel_len'] for b in batch]
     max_spec_len = max(spec_lens) + 1
     if max_spec_len % r != 0:
         max_spec_len += r - max_spec_len % r
-    mel = [pad2d(x[1], max_spec_len) for x in batch]
+    mel = [pad2d(b['mel'], max_spec_len) for b in batch]
     mel = np.stack(mel)
-    ids = [x[2] for x in batch]
-    mel_lens = [x[3] for x in batch]
-    x_lens = torch.tensor(x_lens)
-    mel_lens = torch.tensor(mel_lens)
-    chars = torch.tensor(chars).long()
     mel = torch.tensor(mel)
-    # additional durations for forward
-    if len(batch[0]) > 4:
-        dur = [pad1d(x[4][:max_x_len], max_x_len) for x in batch]
+    item_id = [b['item_id'] for b in batch]
+    mel_lens = [b['mel_len'] for b in batch]
+    mel_lens = torch.tensor(mel_lens)
+
+    dur, pitch = None, None
+    if 'dur' in batch[0]:
+        dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = np.stack(dur)
         dur = torch.tensor(dur).float()
-        pitch = [pad1d(x[5][:max_x_len], max_x_len) for x in batch]
+    if 'pitch' in batch[0]:
+        pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = np.stack(pitch)
         pitch = torch.tensor(pitch).float()
-        return chars, mel, ids, x_lens, mel_lens, dur, pitch
-    else:
-        return chars, mel, ids, x_lens, mel_lens
+
+    return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
+            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch}
 
 
 class BinnedLengthSampler(Sampler):

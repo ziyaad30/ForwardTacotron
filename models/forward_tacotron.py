@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, List
+from typing import Union, Callable, List, Dict
 
 import numpy as np
 
@@ -157,7 +157,13 @@ class ForwardTacotron(nn.Module):
                 nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
                 nn.Dropout(pitch_proj_dropout))
 
-    def forward(self, x, mel, dur, mel_lens, pitch):
+    def forward(self, batch: Dict[str, torch.tensor]) -> Dict[str, torch.tensor]:
+        x = batch['x']
+        mel = batch['mel']
+        dur = batch['dur']
+        mel_lens = batch['mel_len']
+        pitch = batch['pitch']
+
         if self.training:
             self.step += 1
 
@@ -192,7 +198,9 @@ class ForwardTacotron(nn.Module):
 
         x_post = self.pad(x_post, mel.size(2))
         x = self.pad(x, mel.size(2))
-        return x, x_post, dur_hat, pitch_hat
+
+        return {'mel': x, 'mel_post': x_post,
+                'dur': dur_hat, 'pitch': pitch_hat}
 
     def generate(self,
                  x: List[int],

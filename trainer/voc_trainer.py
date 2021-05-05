@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.fatchord_version import WaveRNN
-from trainer.common import Averager, VocSession
+from trainer.common import Averager, VocSession, to_device
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_vocoder_datasets
@@ -69,16 +69,16 @@ class VocTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         for e in range(1, epochs + 1):
-            for i, (x, y, m) in enumerate(session.train_set, 1):
+            for i, batch in enumerate(session.train_set, 1):
                 start = time.time()
                 model.train()
-                x, m, y = x.to(device), m.to(device), y.to(device)
-
-                y_hat = model(x, m)
+                batch = to_device(batch, device=device)
+                x, y = batch['x'], batch['y']
+                y_hat = model(x, batch['mel'])
                 if model.mode == 'RAW':
                     y_hat = y_hat.transpose(1, 2).unsqueeze(-1)
                 elif model.mode == 'MOL':
-                    y = y.float()
+                    y = batch['y'].float()
                 y = y.unsqueeze(-1)
 
                 loss = self.loss_func(y_hat, y)
@@ -126,8 +126,9 @@ class VocTrainer:
         model.eval()
         val_loss = 0
         device = next(model.parameters()).device
-        for i, (x, y, m) in enumerate(val_set, 1):
-            x, m, y = x.to(device), m.to(device), y.to(device)
+        for i, batch in enumerate(val_set, 1):
+            batch = to_device(batch, device=device)
+            x, m, y = batch['x'], batch['y'], batch['mel']
             with torch.no_grad():
                 y_hat = model(x, m)
                 if model.mode == 'RAW':
@@ -149,7 +150,8 @@ class VocTrainer:
         mel_losses = []
         gen_wavs = []
         device = next(model.parameters()).device
-        for i, (m, x) in enumerate(session.val_set_samples, 1):
+        for i, sample in enumerate(session.val_set_samples, 1):
+            m, x = sample['mel'], sample['x']
             if i > hp.voc_gen_num_samples:
                 break
             x = x[0].numpy()
