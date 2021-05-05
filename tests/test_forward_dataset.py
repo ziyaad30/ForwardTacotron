@@ -32,12 +32,14 @@ class TestForwardDataset(unittest.TestCase):
         mels = [np.full((2, 2), fill_value=1), np.full((2, 3), fill_value=2)]
         durs = [np.full(1, fill_value=2), np.full(2, fill_value=3)]
         pitches = [np.full(1, fill_value=5), np.full(2, fill_value=6)]
+
         np.save(mel_dir / '0.npy', mels[0])
         np.save(mel_dir / '1.npy', mels[1])
         np.save(alg_dir / '0.npy', durs[0])
         np.save(alg_dir / '1.npy', durs[1])
         np.save(pitch_dir / '0.npy', pitches[0])
         np.save(pitch_dir / '1.npy', pitches[1])
+
         dataset = ForwardDataset(path=data_dir, dataset_ids=['0', '1'], text_dict=text_dict)
 
         data = [dataset[i] for i in range(len(dataset))]
