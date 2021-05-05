@@ -8,6 +8,7 @@ from torch import optim
 from torch.utils.data.dataloader import DataLoader
 
 from models.tacotron import Tacotron
+from trainer.common import to_device
 from trainer.taco_trainer import TacoTrainer
 from utils import hparams as hp
 from utils.checkpoints import restore_checkpoint
@@ -71,13 +72,13 @@ def create_gta_features(model: Tacotron,
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(train_set) + len(val_set)
     dataset = itertools.chain(train_set, val_set)
-    for i, (x, mels, ids, x_lens, mel_lens) in enumerate(dataset, 1):
-        x, mels = x.to(device), mels.to(device)
+    for i, batch in enumerate(dataset, 1):
+        batch = to_device(batch, device=device)
         with torch.no_grad():
-            _, gta, _ = model(x, mels)
+            _, gta, _ = model(batch['x'], batch['mel'])
         gta = gta.cpu().numpy()
-        for j, item_id in enumerate(ids):
-            mel = gta[j][:, :mel_lens[j]]
+        for j, item_id in enumerate(batch['item_id']):
+            mel = gta[j][:, :batch['mel_len'][j]]
             np.save(str(save_path/f'{item_id}.npy'), mel, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
@@ -104,13 +105,13 @@ def create_align_features(model: Tacotron,
         print('Extracting durations using attention peak counts...')
         dur_extraction_func = extract_durations_per_count
 
-    for i, (x, mels, ids, x_lens, mel_lens) in enumerate(dataset, 1):
-        x, mels = x.to(device), mels.to(device)
+    for i, batch in enumerate(dataset, 1):
+        batch = to_device(batch, device=device)
         with torch.no_grad():
-            _, _, att_batch = model(x, mels)
-        align_score, sharp_score = attention_score(att_batch, mel_lens, r=1)
+            _, _, att_batch = model(batch['x'], batch['mel'])
+        align_score, sharp_score = attention_score(att_batch, batch['mel_len'], r=1)
         att_batch = np_now(att_batch)
-        seq, att, mel_len, item_id = x[0], att_batch[0], mel_lens[0], ids[0]
+        seq, att, mel_len, item_id = batch['x'][0], att_batch[0], batch['mel_len'][0], batch['item_id'][0]
         align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
         att_score_dict[item_id] = (align_score, sharp_score)
         durs = dur_extraction_func(seq, att, mel_len)
