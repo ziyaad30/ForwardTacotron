@@ -84,7 +84,7 @@ if __name__ == '__main__':
 
     text_dict = ljspeech(path)
     text_dict = {item_id: text for item_id, text in text_dict.items()
-                 if item_id in wav_ids and len(text) > 2}
+                 if item_id in wav_ids and len(text) > 1}
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
 
