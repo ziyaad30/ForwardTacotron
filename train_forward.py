@@ -13,6 +13,7 @@ from trainer.forward_trainer import ForwardTrainer
 from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.display import *
+from utils.dsp import DSP
 from utils.files import read_config
 from utils.paths import Paths
 from utils.text.symbols import phonemes
@@ -49,6 +50,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = read_config(args.config)
+    dsp = DSP.from_config(config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
     assert len(os.listdir(paths.alg)) > 0, f'Could not find alignment files in {paths.alg}, please predict ' \
@@ -75,6 +77,6 @@ if __name__ == '__main__':
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     else:
-        trainer = ForwardTrainer(paths)
+        trainer = ForwardTrainer(paths=paths, dsp=dsp, config=config)
         trainer.train(model, optimizer)
 
