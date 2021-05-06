@@ -37,7 +37,7 @@ def normalize_pitch(phoneme_pitches):
 def extract_pitch(save_path: Path, pitch_max_freq: float) -> Tuple[float, float]:
     train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
     val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
-    all_data = filter_max_len(train_data + val_data)
+    all_data = train_data + val_data
     phoneme_pitches = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
         dur = np.load(paths.alg / f'{item_id}.npy')
@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     if args.extract_pitch:
         print('Extracting Pitch Values...')
-        mean, var = extract_pitch(paths.phon_pitch)
+        mean, var = extract_pitch(paths.phon_pitch, pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 
@@ -170,7 +170,9 @@ if __name__ == '__main__':
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
                                               max_mel_len=train_cfg['max_mel_len'],
                                               filter_attention=False)
-        create_align_features(model, train_set, val_set, paths.alg, paths.phon_pitch)
+        create_align_features(model=model, train_set=train_set, val_set=val_set,
+                              save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,
+                              pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)

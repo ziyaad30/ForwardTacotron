@@ -179,8 +179,8 @@ class VocTrainer:
             else:
                 x = DSP.label_2_float(x, bits)
             gen_wav = model.generate(
-                mels=m, save_path=None, batched=self.config['gen_batched'],
-                target=self.config['target'], overlap=self.config['overlaü'],
+                mels=m, batched=self.config['gen_batched'],
+                target=self.config['target'], overlap=self.config['overlap'],
                 mu_law=self.dsp.mu_law, silent=True)
 
             gen_wavs.append(gen_wav)
