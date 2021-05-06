@@ -176,16 +176,16 @@ class Decoder(nn.Module):
 class Tacotron(nn.Module):
 
     def __init__(self, embed_dims, num_chars, encoder_dims, decoder_dims, n_mels, postnet_dims,
-                 encoder_K, lstm_dims, postnet_K, num_highways, dropout, stop_threshold):
+                 encoder_k, lstm_dims, postnet_k, num_highways, dropout, stop_threshold):
         super().__init__()
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
-                               encoder_K, num_highways, dropout)
+                               encoder_k, num_highways, dropout)
         self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
-        self.postnet = CBHG(postnet_K, n_mels, postnet_dims, [256, 80], num_highways)
+        self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
 
         self.init_model()

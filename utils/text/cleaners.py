@@ -68,6 +68,12 @@ def convert_to_ascii(text):
   return unidecode(text)
 
 
+def basic_cleaners_no_phonemes(text, lang):
+  text = collapse_whitespace(text)
+  text = text.strip()
+  return text
+
+
 def basic_cleaners(text, lang):
   text = to_phonemes(text, lang=lang)
   text = collapse_whitespace(text)
