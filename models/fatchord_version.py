@@ -441,5 +441,11 @@ class WaveRNN(nn.Module):
         model_config['hop_length'] = config['dsp']['hop_length']
         model_config['sample_rate'] = config['dsp']['sample_rate']
         model_config['upsample_factors'] = model_config['upsample_factors']
-
         return WaveRNN(**model_config)
+
+    @classmethod
+    def from_checkpoint(cls, path: Path) -> 'WaveRNN':
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model = WaveRNN.from_config(checkpoint['config'])
+        model.load_state_dict(checkpoint['model'])
+        return model

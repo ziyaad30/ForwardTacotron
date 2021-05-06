@@ -109,7 +109,7 @@ if __name__ == '__main__':
                          dropout=hp.tts_dropout,
                          stop_threshold=hp.tts_stop_threshold).to(device)
 
-    tts_load_path = tts_weights if tts_weights else paths.tts_latest_weights
+    tts_load_path = tts_weights if tts_weights else paths.taco_latest_weights
     tts_model.load(tts_load_path)
 
     if input_text:
@@ -152,9 +152,9 @@ if __name__ == '__main__':
             v_type = 'wavernn_unbatched'
 
         if input_text:
-            save_path = paths.tts_output/f'__input_{input_text[:10]}_{v_type}_{tts_k}k.wav'
+            save_path = paths.taco_output / f'__input_{input_text[:10]}_{v_type}_{tts_k}k.wav'
         else:
-            save_path = paths.tts_output/f'{i}_{v_type}_{tts_k}k.wav'
+            save_path = paths.taco_output / f'{i}_{v_type}_{tts_k}k.wav'
 
         if save_attn: save_attention(attention, save_path)
 

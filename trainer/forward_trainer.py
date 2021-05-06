@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
-from utils.checkpoints import save_checkpoint
+from utils.checkpoints import  save_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_pitch
@@ -25,22 +25,23 @@ class ForwardTrainer:
                  config: Dict[str, Any]) -> None:
         self.paths = paths
         self.dsp = dsp
-        self.config = config['forward_tacotron']['training']
+        self.config = config
+        self.train_cfg = config['forward_tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
 
     def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
-        forward_schedule = self.config['schedule']
+        forward_schedule = self.train_cfg['schedule']
         forward_schedule = parse_schedule(forward_schedule)
         for i, session_params in enumerate(forward_schedule, 1):
             lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 train_set, val_set = get_tts_datasets(
                     path=self.paths.data, batch_size=bs, r=1, model_type='forward',
-                    max_mel_len=self.config['max_mel_len'],
-                    filter_attention=self.config['filter_attention'],
-                    filter_min_alignment=self.config['min_attention_alignment'],
-                    filter_min_sharpness=self.config['min_attention_sharpness'])
+                    max_mel_len=self.train_cfg['max_mel_len'],
+                    filter_attention=self.train_cfg['filter_attention'],
+                    filter_min_alignment=self.train_cfg['min_attention_alignment'],
+                    filter_min_sharpness=self.train_cfg['min_attention_sharpness'])
                 session = TTSSession(
                     index=i, r=1, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)
@@ -82,7 +83,7 @@ class ForwardTrainer:
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
-                    self.config['clip_grad_norm'])
+                                               self.train_cfg['clip_grad_norm'])
                 optimizer.step()
 
                 m_loss_avg.add(m1_loss.item() + m2_loss.item())
@@ -98,12 +99,11 @@ class ForwardTrainer:
                       f'| Dur Loss: {dur_loss_avg.get():#.4} | Pitch Loss: {pitch_loss_avg.get():#.4} ' \
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
-                if step % self.config['checkpoint_every'] == 0:
-                    ckpt_name = f'forward_step{k}K'
-                    save_checkpoint('forward', self.paths, model, optimizer,
-                                    name=ckpt_name, is_silent=True)
+                if step % self.train_cfg['checkpoint_every'] == 0:
+                    save_checkpoint(model=model, optim=optimizer, config=self.config,
+                                    path=self.paths.forward_checkpoints / f'forward_step{k}k.pt')
 
-                if step % self.config['plot_every'] == 0:
+                if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
@@ -118,7 +118,8 @@ class ForwardTrainer:
             self.writer.add_scalar('Mel_Loss/val', m_val_loss, model.get_step())
             self.writer.add_scalar('Duration_Loss/val', dur_val_loss, model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', pitch_val_loss, model.get_step())
-            save_checkpoint('forward', self.paths, model, optimizer, is_silent=True)
+            save_checkpoint(model=model, optim=optimizer, config=self.config,
+                            path=self.paths.forward_checkpoints / 'latest_model.pt')
 
             m_loss_avg.reset()
             duration_avg.reset()

@@ -6,8 +6,10 @@ import numpy as np
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+from numba.core.config import reload_config
 
 from models.common_layers import CBHG
+from utils.files import read_config
 from utils.text.symbols import phonemes
 
 
@@ -275,3 +277,10 @@ class ForwardTacotron(nn.Module):
         model_config['num_chars'] = len(phonemes)
         model_config['n_mels'] = config['dsp']['num_mels']
         return ForwardTacotron(**model_config)
+
+    @classmethod
+    def from_checkpoint(cls, path: Path) -> 'ForwardTacotron':
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model = ForwardTacotron.from_config(checkpoint['config'])
+        model.load_state_dict(checkpoint['model'])
+        return model

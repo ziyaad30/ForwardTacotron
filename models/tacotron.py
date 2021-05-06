@@ -365,3 +365,10 @@ class Tacotron(nn.Module):
         model_config['num_chars'] = len(phonemes)
         model_config['n_mels'] = config['dsp']['num_mels']
         return Tacotron(**model_config)
+
+    @classmethod
+    def from_checkpoint(cls, path: Path) -> 'Tacotron':
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model = Tacotron.from_config(checkpoint['config'])
+        model.load_state_dict(checkpoint['model'])
+        return model

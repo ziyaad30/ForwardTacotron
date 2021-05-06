@@ -1,4 +1,3 @@
-import numpy as np
 import argparse
 
 import numpy as np
@@ -23,18 +22,18 @@ if __name__ == '__main__':
     config = read_config(args.config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
     print('Using device:', device)
-
     print('\nInitialising Model...\n')
-
-    voc_model = WaveRNN.from_config(config).to(device)
-
+    voc_model = WaveRNN.from_config(config)
     dsp = DSP.from_config(config)
-    # Check to make sure the hop length is correctly factorised
     assert np.cumprod(config['vocoder']['model']['upsample_factors'])[-1] == dsp.hop_length
 
     optimizer = optim.Adam(voc_model.parameters())
-    restore_checkpoint('voc', paths, voc_model, optimizer, create_if_missing=True)
+    restore_checkpoint(model=voc_model, optim=optimizer,
+                       path=paths.taco_checkpoints / 'latest_model.pt')
+
+    voc_model = voc_model.to(device)
 
     voc_trainer = VocTrainer(paths=paths, dsp=dsp, config=config)
     voc_trainer.train(voc_model, optimizer, train_gta=args.gta)
