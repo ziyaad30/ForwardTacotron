@@ -149,7 +149,7 @@ class ForwardTacotron(nn.Module):
                             in_channels=n_mels,
                             channels=postnet_dims,
                             proj_channels=[postnet_dims, n_mels],
-                            num_highways=highways)
+                            num_highways=num_highways)
         self.dropout = dropout
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_emb_dims = pitch_emb_dims
