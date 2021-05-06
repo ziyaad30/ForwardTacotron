@@ -13,8 +13,8 @@ def save_checkpoint(model: torch.nn.Module,
                     optim: torch.optim.Optimizer,
                     config: Dict[str, Any],
                     path: Path) -> None:
-    torch.save({'model': model,
-                'optim': optim,
+    torch.save({'model': model.state_dict(),
+                'optim': optim.state_dict(),
                 'config': config}, str(path))
 
 
@@ -25,4 +25,4 @@ def restore_checkpoint(model: Union[ForwardTacotron, Tacotron, WaveRNN],
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         model.load_state_dict(checkpoint['model'])
         optim.load_state_dict(checkpoint['optim'])
-        print(f'Restored model with step {model.get_step()}')
+        print(f'Restored model with step {model.get_step()}\n')

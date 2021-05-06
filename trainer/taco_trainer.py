@@ -92,7 +92,7 @@ class TacoTrainer:
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
                     save_checkpoint(model=model, optim=optimizer, config=self.config,
-                                    path=self.paths.taco_checkpoints / f'forward_step{k}k.pt')
+                                    path=self.paths.taco_checkpoints / f'taco_step{k}k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)

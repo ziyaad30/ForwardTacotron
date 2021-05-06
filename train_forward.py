@@ -62,15 +62,9 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     print('\nInitialising Forward TTS Model...\n')
     model = ForwardTacotron.from_config(config)
-
-    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
-    params = sum([np.prod(p.size()) for p in model_parameters])
-    print(f'num params {params}')
-
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.taco_checkpoints / 'latest_model.pt')
-
+                       path=paths.forward_checkpoints / 'latest_model.pt')
     model = model.to(device)
 
     if force_gta:

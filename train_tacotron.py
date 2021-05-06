@@ -151,13 +151,9 @@ if __name__ == '__main__':
     print('\nInitialising Tacotron Model...\n')
     model = Tacotron.from_config(config)
 
-    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
-    params = sum([np.prod(p.size()) for p in model_parameters])
-    print(f'Num Params: {params}')
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
                        path=paths.taco_checkpoints / 'latest_model.pt')
-
     model = model.to(device)
 
     train_cfg = config['tacotron']['training']

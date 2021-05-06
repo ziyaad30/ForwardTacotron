@@ -31,8 +31,7 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(voc_model.parameters())
     restore_checkpoint(model=voc_model, optim=optimizer,
-                       path=paths.taco_checkpoints / 'latest_model.pt')
-
+                       path=paths.voc_checkpoints / 'latest_model.pt')
     voc_model = voc_model.to(device)
 
     voc_trainer = VocTrainer(paths=paths, dsp=dsp, config=config)
