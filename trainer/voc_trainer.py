@@ -74,7 +74,7 @@ class VocTrainer:
         simple_table([(f'Steps ', str(training_steps // 1000) + 'k'),
                       ('Batch Size', session.bs),
                       ('Learning Rate', session.lr),
-                      ('Sequence Length', self.config['voc_seq_len']),
+                      ('Sequence Length', self.config['seq_len']),
                       ('GTA Training', train_gta)])
         for g in optimizer.param_groups:
             g['lr'] = session.lr
