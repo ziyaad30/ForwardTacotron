@@ -119,7 +119,7 @@ class ForwardTacotron(nn.Module):
                  prenet_dims: int,
                  postnet_k: int,
                  postnet_dims: int,
-                 highways: int,
+                 num_highways: int,
                  dropout: float,
                  n_mels: int):
         super().__init__()
@@ -138,7 +138,7 @@ class ForwardTacotron(nn.Module):
                            in_channels=embed_dims,
                            channels=prenet_dims,
                            proj_channels=[prenet_dims, embed_dims],
-                           num_highways=highways)
+                           num_highways=num_highways)
         self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims,
                             rnn_dims,
                             batch_first=True,
