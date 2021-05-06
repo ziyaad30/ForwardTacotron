@@ -170,7 +170,7 @@ class VocTrainer:
         device = next(model.parameters()).device
         for i, sample in enumerate(session.val_set_samples, 1):
             m, x = sample['mel'], sample['x']
-            if i > self.config['gen_num_samples']:
+            if i > self.config['num_gen_samples']:
                 break
             x = x[0].numpy()
             bits = 16 if self.dsp.voc_mode == 'MOL' else self.dsp.bits
