@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Any
 
 
 def get_files(path: Union[str, Path], extension='.wav') -> List[Path]:
@@ -13,6 +13,6 @@ def pickle_binary(data: object, file: Union[str, Path]) -> None:
         pickle.dump(data, f)
 
 
-def unpickle_binary(file: Union[str, Path]) -> object:
+def unpickle_binary(file: Union[str, Path]) -> Any:
     with open(str(file), 'rb') as f:
         return pickle.load(f)
