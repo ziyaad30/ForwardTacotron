@@ -49,8 +49,7 @@ class TacoTrainer:
 
     def train_session(self, model: Tacotron,
                       optimizer: Optimizer,
-                      session: TTSSession,
-                      config: Dict[str, Any]) -> None:
+                      session: TTSSession) -> None:
         current_step = model.get_step()
         training_steps = session.max_step - current_step
         total_iters = len(session.train_set)
@@ -79,7 +78,7 @@ class TacoTrainer:
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                               config['clip_grad_norm'])
+                                               self.config['clip_grad_norm'])
                 optimizer.step()
                 loss_avg.add(loss.item())
                 step = model.get_step()
@@ -90,12 +89,12 @@ class TacoTrainer:
                 msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
-                if step % config['checkpoint_every'] == 0:
+                if step % self.config['checkpoint_every'] == 0:
                     ckpt_name = f'taco_step{k}K'
                     save_checkpoint('tts', self.paths, model, optimizer,
                                     name=ckpt_name, is_silent=True)
 
-                if step % config['plot_every'] == 0:
+                if step % self.config['plot_every'] == 0:
                     self.generate_plots(model, session)
 
                 _, att_score = attention_score(attention, batch['mel_len'])

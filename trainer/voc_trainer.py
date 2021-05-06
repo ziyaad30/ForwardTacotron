@@ -55,7 +55,8 @@ class VocTrainer:
                     path=self.paths.data, batch_size=bs, train_gta=train_gta,
                     max_mel_len=self.config['max_mel_len'], hop_length=self.dsp.hop_length,
                     voc_pad=model.pad, voc_seq_len=self.config['seq_len'],
-                    voc_mode=self.dsp.voc_mode, bits=self.dsp.bits, num_gen_samples=self.config['num_gen_samples'])
+                    voc_mode=self.dsp.voc_mode, bits=self.dsp.bits,
+                    num_gen_samples=self.config['num_gen_samples'])
                 session = VocSession(
                     index=i, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set,

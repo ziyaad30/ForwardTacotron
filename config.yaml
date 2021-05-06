@@ -63,7 +63,7 @@ vocoder:
     gen_samples_every: 5000        # how often to generate samples for cherry-picking models
     num_gen_samples: 3             # number of samples to generate for cherry-picking models
     keep_top_k: 3                  # how many top performing models to keep
-    seq_len: hop_length * 5        # must be a multiple of hop_length
+    seq_len: 1280            # must be a multiple of hop_length
     clip_grad_norm: 4              # set to None if no gradient clipping needed
     max_mel_len: 20000
 

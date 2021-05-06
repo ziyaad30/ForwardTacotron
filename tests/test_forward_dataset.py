@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 
 from utils.dataset import ForwardDataset
+from utils.text.tokenizer import Tokenizer
 
 
 class TestForwardDataset(unittest.TestCase):
@@ -40,7 +41,10 @@ class TestForwardDataset(unittest.TestCase):
         np.save(pitch_dir / '0.npy', pitches[0])
         np.save(pitch_dir / '1.npy', pitches[1])
 
-        dataset = ForwardDataset(path=data_dir, dataset_ids=['0', '1'], text_dict=text_dict)
+        dataset = ForwardDataset(path=data_dir,
+                                 dataset_ids=['0', '1'],
+                                 text_dict=text_dict,
+                                 tokenizer=Tokenizer())
 
         data = [dataset[i] for i in range(len(dataset))]
 
