@@ -114,7 +114,7 @@ class ForwardTacotron(nn.Module):
                  pitch_dropout: float,
                  pitch_emb_dims: int,
                  pitch_proj_dropout: float,
-                 rnn_dim: int,
+                 rnn_dims: int,
                  prenet_k: int,
                  prenet_dims: int,
                  postnet_k: int,
@@ -123,7 +123,7 @@ class ForwardTacotron(nn.Module):
                  dropout: float,
                  n_mels: int):
         super().__init__()
-        self.rnn_dim = rnn_dim
+        self.rnn_dims = rnn_dims
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(embed_dims,
@@ -140,10 +140,10 @@ class ForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=highways)
         self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims,
-                            rnn_dim,
+                            rnn_dims,
                             batch_first=True,
                             bidirectional=True)
-        self.lin = torch.nn.Linear(2 * rnn_dim, n_mels)
+        self.lin = torch.nn.Linear(2 * rnn_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
