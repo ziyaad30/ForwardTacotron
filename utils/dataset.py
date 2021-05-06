@@ -1,11 +1,10 @@
+import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Dict, Union
 
 from utils.dsp import *
-from utils import hparams as hp
 from utils.files import unpickle_binary
-from utils.text import text_to_sequence
 from pathlib import Path
 import random
 
@@ -13,9 +12,11 @@ import random
 ###################################################################################
 # WaveRNN/Vocoder Dataset #########################################################
 ###################################################################################
+from utils.text.tokenizer import Tokenizer
 
 
 class VocoderDataset(Dataset):
+
     def __init__(self, path: Path, dataset_ids, train_gta=False):
         self.metadata = dataset_ids
         self.mel_path = path/'gta' if train_gta else path/'mel'
@@ -31,23 +32,36 @@ class VocoderDataset(Dataset):
         return len(self.metadata)
 
 
-def get_vocoder_datasets(path: Path, batch_size, train_gta):
+def get_vocoder_datasets(path: Path,
+                         batch_size:int,
+                         train_gta: bool,
+                         max_mel_len: int,
+                         hop_length: int,
+                         voc_pad: int,
+                         voc_seq_len: int,
+                         voc_mode: str,
+                         bits: int,
+                         num_gen_samples: int):
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
-    train_ids, train_lens = zip(*filter_max_len(train_data))
-    val_ids, val_lens = zip(*filter_max_len(val_data))
+    train_ids, train_lens = zip(*filter_max_len(train_data, max_mel_len))
+    val_ids, val_lens = zip(*filter_max_len(val_data, max_mel_len))
     train_dataset = VocoderDataset(path, train_ids, train_gta)
     val_dataset = VocoderDataset(path, val_ids, train_gta)
-
+    voc_collator = VocCollator(hop_length=hop_length,
+                               voc_pad=voc_pad,
+                               voc_seq_len=voc_seq_len,
+                               voc_mode=voc_mode,
+                               bits=bits)
     train_set = DataLoader(train_dataset,
-                           collate_fn=collate_vocoder,
+                           collate_fn=voc_collator,
                            batch_size=batch_size,
                            num_workers=0,
                            shuffle=True,
                            pin_memory=True)
 
     val_set = DataLoader(val_dataset,
-                         collate_fn=collate_vocoder,
+                         collate_fn=voc_collator,
                          batch_size=batch_size,
                          num_workers=0,
                          shuffle=False,
@@ -64,38 +78,52 @@ def get_vocoder_datasets(path: Path, batch_size, train_gta):
                                  pin_memory=True)
 
     val_set_samples = [s for i, s in enumerate(val_set_samples)
-                       if i < hp.voc_gen_num_samples]
+                       if i < num_gen_samples]
 
     return train_set, val_set, val_set_samples
 
 
-def collate_vocoder(batch: List[Dict[str, torch.tensor]]):
-    mel_win = hp.voc_seq_len // hp.hop_length + 2 * hp.voc_pad
-    max_offsets = [b['mel'].shape[-1] -2 - (mel_win + 2 * hp.voc_pad) for b in batch]
-    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
-    sig_offsets = [(offset + hp.voc_pad) * hp.hop_length for offset in mel_offsets]
+class VocCollator:
 
-    mels = [b['mel'][:, mel_offsets[i]:mel_offsets[i] + mel_win] for i, b in enumerate(batch)]
+    def __init__(self,
+                 hop_length: int,
+                 voc_pad: int,
+                 voc_seq_len: int,
+                 voc_mode: str,
+                 bits: int):
+        self.hop_length = hop_length
+        self.voc_pad = voc_pad
+        self.voc_seq_len = voc_seq_len
+        self.voc_mode = voc_mode
+        self.bits = bits
 
-    labels = [b['x'][sig_offsets[i]:sig_offsets[i] + hp.voc_seq_len + 1] for i, b in enumerate(batch)]
+    def __call__(self, batch: List[Dict[str, torch.tensor]]):
+        mel_win = self.voc_seq_len // self.hop_length + 2 * self.voc_pad
+        max_offsets = [b['mel'].shape[-1] -2 - (mel_win + 2 * self.voc_pad) for b in batch]
+        mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+        sig_offsets = [(offset + self.voc_pad) * self.hop_length for offset in mel_offsets]
 
-    mels = np.stack(mels).astype(np.float32)
-    labels = np.stack(labels).astype(np.int64)
+        mels = [b['mel'][:, mel_offsets[i]:mel_offsets[i] + mel_win] for i, b in enumerate(batch)]
 
-    mel = torch.tensor(mels)
-    labels = torch.tensor(labels).long()
+        labels = [b['x'][sig_offsets[i]:sig_offsets[i] + self.voc_seq_len + 1] for i, b in enumerate(batch)]
 
-    x = labels[:, :hp.voc_seq_len]
-    y = labels[:, 1:]
+        mels = np.stack(mels).astype(np.float32)
+        labels = np.stack(labels).astype(np.int64)
 
-    bits = 16 if hp.voc_mode == 'MOL' else hp.bits
+        mel = torch.tensor(mels)
+        labels = torch.tensor(labels).long()
 
-    x = label_2_float(x.float(), bits)
+        x = labels[:, :self.voc_seq_len]
+        y = labels[:, 1:]
 
-    if hp.voc_mode == 'MOL':
-        y = label_2_float(y.float(), bits)
+        bits = 16 if self.voc_mode == 'MOL' else self.bits
 
-    return {'mel': mel, 'x': x, 'y': y}
+        x = DSP.label_2_float(x.float(), bits)
+
+        if self.voc_mode == 'MOL':
+            y = DSP.label_2_float(y.float(), bits)
+
+        return {'mel': mel, 'x': x, 'y': y}
 
 
 ###################################################################################
@@ -103,30 +131,50 @@ def collate_vocoder(batch: List[Dict[str, torch.tensor]]):
 ###################################################################################
 
 
-def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
+def get_tts_datasets(path: Path,
+                     batch_size: int,
+                     r: int,
+                     max_mel_len,
+                     filter_attention=True,
+                     filter_min_alignment=0.5,
+                     filter_min_sharpness=0.9,
+                     model_type='tacotron'):
+
+    tokenizer = Tokenizer()
+
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
 
-    train_data = filter_max_len(train_data)
-    val_data = filter_max_len(val_data)
+    train_data = filter_max_len(train_data, max_mel_len)
+    val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
 
-    if model_type == 'forward' and hp.forward_filter_attention:
+    if model_type == 'forward' and filter_attention:
         attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
-        train_data = filter_bad_attentions(train_data, attention_score_dict)
-        val_data = filter_bad_attentions(val_data, attention_score_dict)
+        train_data = filter_bad_attentions(dataset=train_data,
+                                           attention_score_dict=attention_score_dict,
+                                           min_alignment=filter_min_alignment,
+                                           min_sharpness=filter_min_sharpness)
+        val_data = filter_bad_attentions(dataset=val_data,
+                                         attention_score_dict=attention_score_dict,
+                                         min_alignment=filter_min_alignment,
+                                         min_sharpness=filter_min_sharpness)
         print(f'Using {len(train_data)} train files. '
               f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
     if model_type == 'tacotron':
-        train_dataset = TacoDataset(path, train_ids, text_dict)
-        val_dataset = TacoDataset(path, val_ids, text_dict)
+        train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
+                                    text_dict=text_dict, tokenizer=tokenizer)
+        val_dataset = TacoDataset(path=path, dataset_ids=val_ids,
+                                  text_dict=text_dict, tokenizer=tokenizer)
     elif model_type == 'forward':
-        train_dataset = ForwardDataset(path, train_ids, text_dict)
-        val_dataset = ForwardDataset(path, val_ids, text_dict)
+        train_dataset = ForwardDataset(path=path, dataset_ids=train_ids,
+                                       text_dict=text_dict, tokenizer=tokenizer)
+        val_dataset = ForwardDataset(path=path, dataset_ids=val_ids,
+                                     text_dict=text_dict, tokenizer=tokenizer)
     else:
         raise ValueError(f'Unknown model: {model_type}, must be either [tacotron, forward]!')
 
@@ -150,20 +198,23 @@ def get_tts_datasets(path: Path, batch_size, r, model_type='tacotron'):
     return train_set, val_set
 
 
-def filter_max_len(dataset: List[tuple]) -> List[tuple]:
+def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     dataset_filtered = []
     for item_id, mel_len in dataset:
-        if mel_len <= hp.tts_max_mel_len:
+        if mel_len <= max_mel_len:
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 
 
-def filter_bad_attentions(dataset: List[tuple], attention_score_dict: Dict[str, tuple]) -> List[tuple]:
+def filter_bad_attentions(dataset: List[tuple],
+                          attention_score_dict: Dict[str, tuple],
+                          min_alignment: float,
+                          min_sharpness: float) -> List[tuple]:
     dataset_filtered = []
     for item_id, mel_len in dataset:
         align_score, sharp_score = attention_score_dict[item_id]
-        if align_score > hp.forward_min_attention_alignment \
-                and sharp_score > hp.forward_min_attention_sharpness:
+        if align_score > min_alignment \
+                and sharp_score > min_sharpness:
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 
@@ -173,15 +224,17 @@ class TacoDataset(Dataset):
     def __init__(self,
                  path: Path,
                  dataset_ids: List[str],
-                 text_dict: Dict[str, str]) -> None:
+                 text_dict: Dict[str, str],
+                 tokenizer: Tokenizer) -> None:
         self.path = path
         self.metadata = dataset_ids
         self.text_dict = text_dict
+        self.tokenizer = tokenizer
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
-        x = text_to_sequence(text)
+        x = self.tokenizer(text)
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         return {'x': x, 'mel': mel, 'item_id': item_id,
@@ -196,15 +249,17 @@ class ForwardDataset(Dataset):
     def __init__(self,
                  path: Path,
                  dataset_ids: List[str],
-                 text_dict: Dict[str, str]):
+                 text_dict: Dict[str, str],
+                 tokenizer: Tokenizer):
         self.path = path
         self.metadata = dataset_ids
         self.text_dict = text_dict
+        self.tokenizer = tokenizer
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
-        x = text_to_sequence(text)
+        x = self.tokenizer(text)
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))

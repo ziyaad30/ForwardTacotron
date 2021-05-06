@@ -1,5 +1,5 @@
 import time
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 import torch
 from torch.optim.optimizer import Optimizer
@@ -7,29 +7,40 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1, to_device
-from utils import hparams as hp
+from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_pitch
-from utils.dsp import reconstruct_waveform, np_now
+from utils.dsp import DSP
+from utils.files import parse_schedule
 from utils.paths import Paths
 
 
 class ForwardTrainer:
 
-    def __init__(self, paths: Paths) -> None:
+    def __init__(self,
+                 paths: Paths,
+                 dsp: DSP,
+                 config: Dict[str, Any]) -> None:
         self.paths = paths
+        self.dsp = dsp
+        self.config = config['forward_tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
 
     def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
-        for i, session_params in enumerate(hp.forward_schedule, 1):
+        forward_schedule = self.config['schedule']
+        forward_schedule = parse_schedule(forward_schedule)
+        for i, session_params in enumerate(forward_schedule, 1):
             lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 train_set, val_set = get_tts_datasets(
-                    path=self.paths.data, batch_size=bs, r=1, model_type='forward')
+                    path=self.paths.data, batch_size=bs, r=1, model_type='forward',
+                    max_mel_len=self.config['max_mel_len'],
+                    filter_attention=self.config['filter_attention'],
+                    filter_min_alignment=self.config['min_attention_alignment'],
+                    filter_min_sharpness=self.config['min_attention_sharpness'])
                 session = TTSSession(
                     index=i, r=1, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)
@@ -70,7 +81,8 @@ class ForwardTrainer:
                 loss = m1_loss + m2_loss + 0.1 * dur_loss + 0.1 * pitch_loss
                 optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), hp.tts_clip_grad_norm)
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                    self.config['clip_grad_norm'])
                 optimizer.step()
 
                 m_loss_avg.add(m1_loss.item() + m2_loss.item())
@@ -86,12 +98,12 @@ class ForwardTrainer:
                       f'| Dur Loss: {dur_loss_avg.get():#.4} | Pitch Loss: {pitch_loss_avg.get():#.4} ' \
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
-                if step % hp.forward_checkpoint_every == 0:
+                if step % self.config['checkpoint_every'] == 0:
                     ckpt_name = f'forward_step{k}K'
                     save_checkpoint('forward', self.paths, model, optimizer,
                                     name=ckpt_name, is_silent=True)
 
-                if step % hp.forward_plot_every == 0:
+                if step % self.config['plot_every'] == 0:
                     self.generate_plots(model, session)
 
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
@@ -159,15 +171,15 @@ class ForwardTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = reconstruct_waveform(m2_hat)
-        target_wav = reconstruct_waveform(m_target)
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
+        target_wav = self.dsp.griffinlim(m_target)
 
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         m1_hat, m2_hat, dur_hat, pitch_hat = model.generate(batch['x'][0, :batch['x_len'][0]].tolist())
         m1_hat_fig = plot_mel(m1_hat)
@@ -180,11 +192,11 @@ class ForwardTrainer:
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = reconstruct_waveform(m2_hat)
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
         self.writer.add_audio(
             tag='Generated/target_wav', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)

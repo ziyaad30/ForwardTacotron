@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, List, Dict
+from typing import Union, Callable, List, Dict, Any
 
 import numpy as np
 
@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 
 from models.common_layers import CBHG
+from utils.text.symbols import phonemes
 
 
 class LengthRegulator(nn.Module):
@@ -268,3 +269,9 @@ class ForwardTacotron(nn.Module):
         with open(path, 'a') as f:
             print(msg, file=f)
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'ForwardTacotron':
+        model_config = config['tacotron']['model']
+        model_config['num_chars'] = len(phonemes)
+        model_config['n_mels'] = config['dsp']['num_mels']
+        return ForwardTacotron(**model_config)

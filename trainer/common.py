@@ -99,3 +99,6 @@ def to_device(batch: Dict[str, torch.tensor],
         val = val.to(device) if torch.is_tensor(val) else val
         output[key] = val
     return output
+
+
+def np_now(x: torch.Tensor): return x.detach().cpu().numpy()

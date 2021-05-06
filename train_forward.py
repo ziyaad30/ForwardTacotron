@@ -10,10 +10,10 @@ from torch.utils.data.dataloader import DataLoader
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
 from trainer.forward_trainer import ForwardTrainer
-from utils import hparams as hp
 from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.display import *
+from utils.files import read_config
 from utils.paths import Paths
 from utils.text.symbols import phonemes
 
@@ -45,12 +45,12 @@ if __name__ == '__main__':
     # Parse Arguments
     parser = argparse.ArgumentParser(description='Train Tacotron TTS')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
-    parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
+    parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
     args = parser.parse_args()
 
-    hp.configure(args.hp_file)  # Load hparams from file
+    config = read_config(args.config)
+    paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
-    paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
     assert len(os.listdir(paths.alg)) > 0, f'Could not find alignment files in {paths.alg}, please predict ' \
                                            f'alignments first with python train_tacotron.py --force_align!'
 
@@ -60,24 +60,7 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     print('\nInitialising Forward TTS Model...\n')
-    model = ForwardTacotron(embed_dims=hp.forward_embed_dims,
-                            num_chars=len(phonemes),
-                            durpred_rnn_dims=hp.forward_durpred_rnn_dims,
-                            durpred_conv_dims=hp.forward_durpred_conv_dims,
-                            durpred_dropout=hp.forward_durpred_dropout,
-                            pitch_rnn_dims=hp.forward_pitch_rnn_dims,
-                            pitch_conv_dims=hp.forward_pitch_conv_dims,
-                            pitch_dropout=hp.forward_pitch_dropout,
-                            pitch_emb_dims=hp.forward_pitch_emb_dims,
-                            pitch_proj_dropout=hp.forward_pitch_proj_dropout,
-                            rnn_dim=hp.forward_rnn_dims,
-                            postnet_k=hp.forward_postnet_K,
-                            postnet_dims=hp.forward_postnet_dims,
-                            prenet_k=hp.forward_prenet_K,
-                            prenet_dims=hp.forward_prenet_dims,
-                            highways=hp.forward_num_highways,
-                            dropout=hp.forward_dropout,
-                            n_mels=hp.num_mels).to(device)
+    model = ForwardTacotron.from_config(config).to(device)
 
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])

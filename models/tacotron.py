@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pathlib import Path
-from typing import Union
+from typing import Union, Dict, Any
 
 from models.common_layers import CBHG
+from utils.text.symbols import phonemes
 
 
 class Encoder(nn.Module):
@@ -173,7 +174,8 @@ class Decoder(nn.Module):
 
 
 class Tacotron(nn.Module):
-    def __init__(self, embed_dims, num_chars, encoder_dims, decoder_dims, n_mels, fft_bins, postnet_dims,
+
+    def __init__(self, embed_dims, num_chars, encoder_dims, decoder_dims, n_mels, postnet_dims,
                  encoder_K, lstm_dims, postnet_K, num_highways, dropout, stop_threshold):
         super().__init__()
         self.n_mels = n_mels
@@ -184,7 +186,7 @@ class Tacotron(nn.Module):
         self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_K, n_mels, postnet_dims, [256, 80], num_highways)
-        self.post_proj = nn.Linear(postnet_dims * 2, fft_bins, bias=False)
+        self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
 
         self.init_model()
         self.num_params()
@@ -356,3 +358,10 @@ class Tacotron(nn.Module):
         if print_out:
             print('Trainable Parameters: %.3fM' % parameters)
         return parameters
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'Tacotron':
+        model_config = config['tacotron']['model']
+        model_config['num_chars'] = len(phonemes)
+        model_config['n_mels'] = config['dsp']['num_mels']
+        return Tacotron(**model_config)

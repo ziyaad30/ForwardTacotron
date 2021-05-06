@@ -7,50 +7,34 @@ from torch import optim
 
 from models.fatchord_version import WaveRNN
 from trainer.voc_trainer import VocTrainer
-from utils import hparams as hp
 from utils.checkpoints import restore_checkpoint
+from utils.dsp import DSP
+from utils.files import read_config
 from utils.paths import Paths
 
 if __name__ == '__main__':
 
     # Parse Arguments
     parser = argparse.ArgumentParser(description='Train WaveRNN Vocoder')
-    parser.add_argument('--lr', '-l', type=float,  help='[float] override hparams.py learning rate')
     parser.add_argument('--gta', '-g', action='store_true', help='train wavernn on GTA features')
-    parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
-
+    parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
     args = parser.parse_args()
-    hp.configure(args.hp_file)  # load hparams from file
 
-    paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
-
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
+    config = read_config(args.config)
+    paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     print('\nInitialising Model...\n')
 
-    # Instantiate WaveRNN Model
-    voc_model = WaveRNN(rnn_dims=hp.voc_rnn_dims,
-                        fc_dims=hp.voc_fc_dims,
-                        bits=hp.bits,
-                        pad=hp.voc_pad,
-                        upsample_factors=hp.voc_upsample_factors,
-                        feat_dims=hp.num_mels,
-                        compute_dims=hp.voc_compute_dims,
-                        res_out_dims=hp.voc_res_out_dims,
-                        res_blocks=hp.voc_res_blocks,
-                        hop_length=hp.hop_length,
-                        sample_rate=hp.sample_rate,
-                        mode=hp.voc_mode).to(device)
+    voc_model = WaveRNN.from_config(config).to(device)
 
+    dsp = DSP.from_config(config)
     # Check to make sure the hop length is correctly factorised
-    assert np.cumprod(hp.voc_upsample_factors)[-1] == hp.hop_length
+    assert np.cumprod(config['vocoder']['model']['upsample_factors'])[-1] == dsp.hop_length
 
     optimizer = optim.Adam(voc_model.parameters())
     restore_checkpoint('voc', paths, voc_model, optimizer, create_if_missing=True)
 
-    voc_trainer = VocTrainer(paths)
+    voc_trainer = VocTrainer(paths=paths, dsp=dsp, config=config)
     voc_trainer.train(voc_model, optimizer, train_gta=args.gta)

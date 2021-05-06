@@ -1,5 +1,4 @@
 from phonemizer.phonemize import phonemize
-from utils import hparams as hp
 from utils.text.symbols import phonemes_set
 
 """ from https://github.com/keithito/tacotron """
@@ -69,27 +68,26 @@ def convert_to_ascii(text):
   return unidecode(text)
 
 
-def basic_cleaners(text):
-  text = to_phonemes(text)
+def basic_cleaners(text, lang):
+  text = to_phonemes(text, lang=lang)
   text = collapse_whitespace(text)
   text = text.strip()
   return text
 
 
-def english_cleaners(text):
+def english_cleaners(text, lang):
   text = convert_to_ascii(text)
   text = expand_numbers(text)
   text = expand_abbreviations(text)
-  text = to_phonemes(text)
+  text = to_phonemes(text, lang=lang)
   text = collapse_whitespace(text)
   text = text.strip()
   return text
 
 
-def to_phonemes(text):
-    text = text.replace('-', '—')
+def to_phonemes(text: str, lang: str) -> str:
     phonemes = phonemize(text,
-                         language=hp.language,
+                         language=lang,
                          backend='espeak',
                          strip=True,
                          preserve_punctuation=True,
@@ -97,6 +95,5 @@ def to_phonemes(text):
                          njobs=1,
                          punctuation_marks=';:,.!?¡¿—…"«»“”()',
                          language_switch='remove-flags')
-    phonemes = phonemes.replace('—', '-')
     phonemes = ''.join([p for p in phonemes if p in phonemes_set])
     return phonemes

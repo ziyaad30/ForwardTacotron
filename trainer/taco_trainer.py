@@ -5,39 +5,52 @@ import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 from models.tacotron import Tacotron
-from trainer.common import Averager, TTSSession, to_device
-from utils import hparams as hp
+from trainer.common import Averager, TTSSession, to_device, np_now
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_attention
-from utils.dsp import reconstruct_waveform, np_now
+from utils.dsp import DSP
+from utils.files import parse_schedule
 from utils.metrics import attention_score
 from utils.paths import Paths
 
 
 class TacoTrainer:
 
-    def __init__(self, paths: Paths) -> None:
+    def __init__(self,
+                 paths: Paths,
+                 dsp: DSP,
+                 config: Dict[str, Any]) -> None:
         self.paths = paths
+        self.dsp = dsp
+        self.config = config['tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.tts_log, comment='v1')
 
-    def train(self, model: Tacotron, optimizer: Optimizer) -> None:
-        for i, session_params in enumerate(hp.tts_schedule, 1):
+    def train(self,
+              model: Tacotron,
+              optimizer: Optimizer) -> None:
+        tts_schedule = self.config['schedule']
+        tts_schedule = parse_schedule(tts_schedule)
+        for i, session_params in enumerate(tts_schedule, 1):
             r, lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 train_set, val_set = get_tts_datasets(
-                    path=self.paths.data, batch_size=bs, r=r, model_type='tacotron')
+                    path=self.paths.data, batch_size=bs, r=r, model_type='tacotron',
+                    max_mel_len=self.config['max_mel_len'], filter_attention=False
+                )
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)
-                self.train_session(model, optimizer, session)
+                self.train_session(model, optimizer, session=session)
 
     def train_session(self, model: Tacotron,
-                      optimizer: Optimizer, session: TTSSession) -> None:
+                      optimizer: Optimizer,
+                      session: TTSSession,
+                      config: Dict[str, Any]) -> None:
         current_step = model.get_step()
         training_steps = session.max_step - current_step
         total_iters = len(session.train_set)
@@ -65,7 +78,8 @@ class TacoTrainer:
                 loss = m1_loss + m2_loss
                 optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), hp.tts_clip_grad_norm)
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               config['clip_grad_norm'])
                 optimizer.step()
                 loss_avg.add(loss.item())
                 step = model.get_step()
@@ -76,12 +90,12 @@ class TacoTrainer:
                 msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
-                if step % hp.tts_checkpoint_every == 0:
+                if step % config['checkpoint_every'] == 0:
                     ckpt_name = f'taco_step{k}K'
                     save_checkpoint('tts', self.paths, model, optimizer,
                                     name=ckpt_name, is_silent=True)
 
-                if step % hp.tts_plot_every == 0:
+                if step % config['plot_every'] == 0:
                     self.generate_plots(model, session)
 
                 _, att_score = attention_score(attention, batch['mel_len'])
@@ -142,15 +156,15 @@ class TacoTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = reconstruct_waveform(m2_hat)
-        target_wav = reconstruct_waveform(m_target)
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
+        target_wav = self.dsp.griffinlim(m_target)
 
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         m1_hat, m2_hat, att = model.generate(batch['x'][0].tolist(), steps=batch['mel_len'][0] + 20)
         att_fig = plot_attention(att)
@@ -162,11 +176,11 @@ class TacoTrainer:
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = reconstruct_waveform(m2_hat)
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
         self.writer.add_audio(
             tag='Generated/target_wav', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=hp.sample_rate)
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
