@@ -271,7 +271,7 @@ class ForwardTacotron(nn.Module):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'ForwardTacotron':
-        model_config = config['tacotron']['model']
+        model_config = config['forward_tacotron']['model']
         model_config['num_chars'] = len(phonemes)
         model_config['n_mels'] = config['dsp']['num_mels']
         return ForwardTacotron(**model_config)
