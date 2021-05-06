@@ -202,8 +202,6 @@ class VocTrainer:
 
     def track_top_models(self, mel_loss, gen_wav, model):
         """ Keeps track of top k models and saves them according to their current rank """
-        print()
-        print(f'mel loss {mel_loss}')
         for j, (l, g, m, m_n) in enumerate(self.top_k_models):
             print(f'{j} {l} {m} {m_n}')
         if len(self.top_k_models) < self.config['keep_top_k'] or mel_loss < self.top_k_models[-1][0]:
@@ -225,7 +223,3 @@ class VocTrainer:
                 self.writer.add_audio(
                     tag=f'Top_K_Models/generated_top_{i}',
                     snd_tensor=g_wav, global_step=m_step, sample_rate=self.dsp.sample_rate)
-
-        print('sorted ranks:')
-        for j, (l, g, m, m_n) in enumerate(self.top_k_models):
-            print(f'{j} {l} {m} {m_n}')
