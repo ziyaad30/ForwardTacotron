@@ -42,6 +42,10 @@ def collapse_whitespace(text):
     return re.sub(_whitespace_re, ' ', text)
 
 
+def no_cleaners(text):
+    return text
+
+
 def english_cleaners(text):
     text = unidecode(text)
     text = normalize_numbers(text)
@@ -72,7 +76,7 @@ class Cleaner:
         if cleaner_name == 'english_cleaners':
             self.clean_func = english_cleaners
         elif cleaner_name == 'no_cleaners':
-            self.clean_func = lambda x: x
+            self.clean_func = no_cleaners
         else:
             raise ValueError(f'Cleaner not supported: {cleaner_name}! '
                              f'Currently supported: [\'english_cleaners\', \'no_cleaners\']')
