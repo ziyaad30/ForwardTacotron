@@ -177,7 +177,7 @@ if __name__ == '__main__':
         trainer.train(model, optimizer)
         print('Creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=train_cfg['max_mel_len'],
+                                              max_mel_len=99_000,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
                               save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,
