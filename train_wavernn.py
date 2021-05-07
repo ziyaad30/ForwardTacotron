@@ -23,14 +23,14 @@ if __name__ == '__main__':
 
     print('Using device:', device)
     print('\nInitialising Model...\n')
-    voc_model = WaveRNN.from_config(config)
+    voc_model = WaveRNN.from_config(config).to(device)
     dsp = DSP.from_config(config)
     assert np.cumprod(config['vocoder']['model']['upsample_factors'])[-1] == dsp.hop_length
 
     optimizer = optim.Adam(voc_model.parameters())
     restore_checkpoint(model=voc_model, optim=optimizer,
-                       path=paths.voc_checkpoints / 'latest_model.pt')
-    voc_model = voc_model.to(device)
+                       path=paths.voc_checkpoints / 'latest_model.pt',
+                       device=device)
 
     voc_trainer = VocTrainer(paths=paths, dsp=dsp, config=config)
     voc_trainer.train(voc_model, optimizer, train_gta=args.gta)

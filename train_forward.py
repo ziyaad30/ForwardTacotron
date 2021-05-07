@@ -60,15 +60,16 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     print('\nInitialising Forward TTS Model...\n')
-    model = ForwardTacotron.from_config(config)
+    model = ForwardTacotron.from_config(config).to(device)
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.forward_checkpoints / 'latest_model.pt')
-    model = model.to(device)
+                       path=paths.forward_checkpoints / 'latest_model.pt',
+                       device=device)
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
-        train_set, val_set = get_tts_datasets(paths.data, 8, r=1, model_type='forward')
+        train_set, val_set = get_tts_datasets(
+            paths.data, 8, r=1, model_type='forward', filter_attention=False)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     else:

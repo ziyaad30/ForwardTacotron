@@ -148,12 +148,12 @@ if __name__ == '__main__':
 
     # Instantiate Tacotron Model
     print('\nInitialising Tacotron Model...\n')
-    model = Tacotron.from_config(config)
+    model = Tacotron.from_config(config).to(device)
 
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.taco_checkpoints / 'latest_model.pt')
-    model = model.to(device)
+                       path=paths.taco_checkpoints / 'latest_model.pt',
+                       device=device)
 
     train_cfg = config['tacotron']['training']
     if args.force_gta:
