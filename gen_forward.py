@@ -20,6 +20,7 @@ def load_forward_taco(checkpoint_path: str) -> Tuple[ForwardTacotron, Dict[str, 
     config = checkpoint['config']
     tts_model = ForwardTacotron.from_config(config)
     tts_model.load_state_dict(checkpoint['model'])
+    print(f'Loaded forward taco with step {tts_model.get_step()}')
     return tts_model, config
 
 
@@ -29,6 +30,7 @@ def load_wavernn(checkpoint_path: str) -> Tuple[WaveRNN, Dict[str, Any]]:
     config = checkpoint['config']
     voc_model = WaveRNN.from_config(config)
     voc_model.load_state_dict(checkpoint['model'])
+    print(f'Loaded model with step {voc_model.get_step()}')
     return voc_model, config
 
 
@@ -47,12 +49,9 @@ if __name__ == '__main__':
     # name of subcommand goes to args.vocoder
     subparsers = parser.add_subparsers(dest='vocoder')
     wr_parser = subparsers.add_parser('wavernn')
-    wr_parser.add_argument('--batched', '-b', dest='batched', action='store_true', help='Fast Batched Generation')
-    wr_parser.add_argument('--unbatched', '-u', dest='batched', action='store_false', help='Slow Unbatched Generation')
     wr_parser.add_argument('--overlap', '-o', default=550,  type=int, help='[int] number of crossover samples')
     wr_parser.add_argument('--target', '-t', default=11_000, type=int, help='[int] number of samples in each batch index')
     wr_parser.add_argument('--voc_checkpoint', type=str, help='[string/path] Load in different WaveRNN weights')
-    wr_parser.set_defaults(batched=None)
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
@@ -107,6 +106,8 @@ if __name__ == '__main__':
         print(f'\n| Generating {i}/{len(texts)}')
         x = cleaner(x)
         x = tokenizer(x)
+        x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
+
         wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
 
         _, m, dur, pitch = tts_model.generate(x=x, alpha=args.alpha,
@@ -117,7 +118,7 @@ if __name__ == '__main__':
         if args.vocoder == 'wavernn':
             m = torch.tensor(m).unsqueeze(0)
             wav = voc_model.generate(mels=m,
-                                     batched=args.batched,
+                                     batched=True,
                                      target=args.target,
                                      overlap=args.overlap,
                                      mu_law=voc_dsp.mu_law)

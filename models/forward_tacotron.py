@@ -87,6 +87,7 @@ class ConvResNet(nn.Module):
         x = x.transpose(1, 2)
         return x
 
+
 class BatchNormConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel, activation=None):
@@ -206,12 +207,10 @@ class ForwardTacotron(nn.Module):
                 'dur': dur_hat, 'pitch': pitch_hat}
 
     def generate(self,
-                 x: List[int],
+                 x: torch.tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> tuple:
         self.eval()
-        device = next(self.parameters()).device  # use same device as parameters
-        x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
         x = self.embedding(x)
         dur = self.dur_pred(x, alpha=alpha)

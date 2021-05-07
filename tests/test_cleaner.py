@@ -11,6 +11,9 @@ class TestCleaner(unittest.TestCase):
         cleaned = cleaner('hello there!')
         self.assertEqual('həloʊ ðɛɹ!', cleaned)
 
+        cleaned = cleaner('hello there?!.')
+        self.assertEqual('həloʊ ðɛɹ?!.', cleaned)
+
         cleaner = Cleaner(cleaner_name='no_cleaners',
                           use_phonemes=False, lang='en-us')
         cleaned = cleaner(' Hello   there!')

@@ -258,12 +258,11 @@ class Tacotron(nn.Module):
 
         return mel_outputs, linear, attn_scores
 
-    def generate(self, x, steps=2000):
+    def generate(self, x: torch.tensor, steps=2000):
         self.eval()
         device = next(self.parameters()).device  # use same device as parameters
 
         batch_size = 1
-        x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
         # Need to initialise all hidden states and pack into tuple for tidyness
         attn_hidden = torch.zeros(batch_size, self.decoder_dims, device=device)
