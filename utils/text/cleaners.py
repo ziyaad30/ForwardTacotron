@@ -71,7 +71,7 @@ class Cleaner:
 
     def __init__(self,
                  cleaner_name: str,
-                 use_phonemes: str,
+                 use_phonemes: bool,
                  lang: str) -> None:
         if cleaner_name == 'english_cleaners':
             self.clean_func = english_cleaners

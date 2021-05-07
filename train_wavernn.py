@@ -12,8 +12,6 @@ from utils.files import read_config
 from utils.paths import Paths
 
 if __name__ == '__main__':
-
-    # Parse Arguments
     parser = argparse.ArgumentParser(description='Train WaveRNN Vocoder')
     parser.add_argument('--gta', '-g', action='store_true', help='train wavernn on GTA features')
     parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')

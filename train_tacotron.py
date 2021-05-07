@@ -126,7 +126,6 @@ def create_align_features(model: Tacotron,
 
 
 if __name__ == '__main__':
-    # Parse Arguments
     parser = argparse.ArgumentParser(description='Train Tacotron TTS')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')

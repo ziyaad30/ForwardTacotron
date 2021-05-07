@@ -67,7 +67,6 @@ class DSP:
     def save_wav(self, wav: np.array, path: Union[str, Path]) -> None:
         wav = wav.astype(np.float32)
         sf.write(path, wav, samplerate=self.sample_rate)
-        librosa.output.write_wav(path, wav, sr=self.sample_rate)
 
     def wav_to_mel(self, y: np.array, normalize=True) -> np.array:
         spec = librosa.stft(

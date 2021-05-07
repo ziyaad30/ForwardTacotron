@@ -5,7 +5,7 @@ from typing import Tuple, Dict, Any
 import torch
 
 from models.fatchord_version import WaveRNN
-from models.forward_tacotron import ForwardTacotron
+from models.tacotron import Tacotron
 from utils.display import simple_table
 from utils.dsp import DSP
 from utils.files import read_config
@@ -14,11 +14,11 @@ from utils.text.cleaners import Cleaner
 from utils.text.tokenizer import Tokenizer
 
 
-def load_forward_taco(checkpoint_path: str) -> Tuple[ForwardTacotron, Dict[str, Any]]:
+def load_taco(checkpoint_path: str) -> Tuple[Tacotron, Dict[str, Any]]:
     print(f'Loading tts checkpoint {checkpoint_path}')
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
     config = checkpoint['config']
-    tts_model = ForwardTacotron.from_config(config)
+    tts_model = Tacotron.from_config(config)
     tts_model.load_state_dict(checkpoint['model'])
     return tts_model, config
 
@@ -40,19 +40,16 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', type=str, default=None, help='[string/path] path to .pt model file.')
     parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams. Only'
                                                                                 'used if no checkpoint is set.')
-    parser.add_argument('--alpha', type=float, default=1., help='Parameter for controlling length regulator for speedup '
-                                                                'or slow-down of generated speech, e.g. alpha=2.0 is double-time')
-    parser.add_argument('--amp', type=float, default=1., help='Parameter for controlling pitch amplification')
+    parser.add_argument('--steps', type=int, default=1000, help='Max number of steps.')
 
     # name of subcommand goes to args.vocoder
     subparsers = parser.add_subparsers(dest='vocoder')
     wr_parser = subparsers.add_parser('wavernn')
-    wr_parser.add_argument('--batched', '-b', dest='batched', action='store_true', help='Fast Batched Generation')
+    wr_parser.add_argument('--batched', '-b', default=None, dest='batched', action='store_true', help='Fast Batched Generation')
     wr_parser.add_argument('--unbatched', '-u', dest='batched', action='store_false', help='Slow Unbatched Generation')
     wr_parser.add_argument('--overlap', '-o', default=550,  type=int, help='[int] number of crossover samples')
     wr_parser.add_argument('--target', '-t', default=11_000, type=int, help='[int] number of samples in each batch index')
     wr_parser.add_argument('--voc_checkpoint', type=str, help='[string/path] Load in different WaveRNN weights')
-    wr_parser.set_defaults(batched=None)
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
@@ -66,9 +63,9 @@ if __name__ == '__main__':
     if checkpoint_path is None:
         config = read_config(args.config)
         paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
-        checkpoint_path = paths.forward_checkpoints / 'latest_model.pt'
+        checkpoint_path = paths.taco_checkpoints / 'latest_model.pt'
 
-    tts_model, config = load_forward_taco(checkpoint_path)
+    tts_model, config = load_taco(checkpoint_path)
     dsp = DSP.from_config(config)
 
     voc_model, voc_dsp = None, None
@@ -107,10 +104,9 @@ if __name__ == '__main__':
         print(f'\n| Generating {i}/{len(texts)}')
         x = cleaner(x)
         x = tokenizer(x)
-        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
+        wav_name = f'{i}_taco_{tts_k}k_{args.vocoder}'
 
-        _, m, dur, pitch = tts_model.generate(x=x, alpha=args.alpha,
-                                              pitch_function=pitch_function)
+        m, _, _ = tts_model.generate(x=x, steps=args.steps)
         if args.vocoder == 'melgan':
             m = torch.tensor(m).unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
