@@ -1,10 +1,11 @@
 
-voc_model_id: 'ljspeech_raw'
-tts_model_id: 'ljspeech_tts'
+voc_model_id: 'asvoice2_phons_bind_raw'
+tts_model_id: 'asvoice2_phons_bind_tts'
 
 data_path: 'data/' # output data path
 
 dsp:
+
   sample_rate: 22050
   n_fft: 1024
   num_mels: 80
@@ -32,10 +33,12 @@ dsp:
 
 
 preprocessing:
+
   seed: 42
   n_val: 200
   language: 'en-us'
-  cleaner_name: 'english_cleaners'
+  cleaner_name: 'english_cleaners'     # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: True                   # whether to phonemize the text
   min_text_len: 2
 
   # Duration Extraction from Attention
@@ -43,6 +46,7 @@ preprocessing:
 
 
 vocoder:
+
   model:
     mode: 'RAW'                    # either 'RAW' (softmax on raw bits) or 'MOL' (sample from mixture of logistics)
     upsample_factors: [4, 8, 8]   # NB - this needs to correctly factorise hop_length
@@ -52,7 +56,6 @@ vocoder:
     res_out_dims: 128
     res_blocks: 10
     pad: 2                         # this will pad the input so that the resnet can 'see' wider than input length
-
 
   training:
     schedule:
@@ -74,6 +77,7 @@ vocoder:
 
 
 tacotron:
+
   model:
     embed_dims: 256                # embedding dimension for the graphemes/phoneme inputs
     encoder_dims: 128
@@ -100,6 +104,7 @@ tacotron:
 
 
 forward_tacotron:
+
   model:
     embed_dims: 256             # embedding dimension for the graphemes/phoneme inputs
     prenet_dims: 256

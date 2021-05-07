@@ -1,6 +1,5 @@
 import argparse
 from multiprocessing import Pool, cpu_count
-from pathlib import Path
 from random import Random
 from typing import Tuple, Dict
 
@@ -10,7 +9,7 @@ from utils.display import *
 from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
-from utils.text import cleaners
+from utils.text.cleaners import Cleaner
 from utils.text.recipes import ljspeech
 
 
@@ -30,7 +29,7 @@ class Preprocessor:
     def __init__(self,
                  paths: Paths,
                  text_dict: Dict[str, str],
-                 cleaner: cleaners,
+                 cleaner: Cleaner,
                  lang: str,
                  dsp: DSP):
         self.paths = paths
@@ -46,7 +45,7 @@ class Preprocessor:
         np.save(self.paths.quant/f'{wav_id}.npy', x, allow_pickle=False)
         np.save(self.paths.raw_pitch/f'{wav_id}.npy', raw_pitch, allow_pickle=False)
         text = self.text_dict[wav_id]
-        text = self.cleaner(text, self.lang)
+        text = self.cleaner(text)
         return wav_id, m.shape[-1], text
 
     def _convert_file(self, path: Path) -> Tuple[np.array, np.array, np.array]:
@@ -109,10 +108,11 @@ if __name__ == '__main__':
     pool = Pool(processes=n_workers)
     dataset = []
     cleaned_texts = []
+    cleaner = Cleaner.from_config(config)
     preprocessor = Preprocessor(paths=paths,
                                 text_dict=text_dict,
                                 dsp=dsp,
-                                cleaner=getattr(cleaners, config['preprocessing']['cleaner_name']),
+                                cleaner=cleaner,
                                 lang=config['preprocessing']['language'])
 
     for i, (item_id, length, cleaned_text) in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):

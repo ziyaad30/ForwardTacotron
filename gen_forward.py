@@ -1,22 +1,43 @@
 import argparse
+from pathlib import Path
+from typing import Tuple, Dict, Any
 
 import torch
 
 from models.fatchord_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
 from utils.display import simple_table
+from utils.dsp import DSP
+from utils.files import read_config
 from utils.paths import Paths
-from utils.text.symbols import phonemes
+from utils.text.cleaners import Cleaner
+from utils.text.tokenizer import Tokenizer
+
+
+def load_forward_taco(checkpoint_path: str) -> Tuple[ForwardTacotron, Dict[str, Any]]:
+    print(f'Loading tts checkpoint {checkpoint_path}')
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+    config = checkpoint['config']
+    tts_model = ForwardTacotron.from_config(config)
+    tts_model.load_state_dict(checkpoint['model'])
+    return tts_model, config
+
+
+def load_wavernn(checkpoint_path: str) -> Tuple[WaveRNN, Dict[str, Any]]:
+    print(f'Loading voc checkpoint {checkpoint_path}')
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+    config = checkpoint['config']
+    voc_model = WaveRNN.from_config(config)
+    voc_model.load_state_dict(checkpoint['model'])
+    return voc_model, config
+
 
 if __name__ == '__main__':
 
     # Parse Arguments
     parser = argparse.ArgumentParser(description='TTS Generator')
     parser.add_argument('--input_text', '-i', type=str, help='[string] Type in something here and TTS will generate it!')
-    parser.add_argument('--tts_weights', type=str, help='[string/path] Load in different FastSpeech weights')
-    parser.add_argument('--save_attention', '-a', dest='save_attn', action='store_true', help='Save Attention Plots')
-    parser.add_argument('--force_cpu', '-c', action='store_true', help='Forces CPU-only training, even when in CUDA capable environment')
-    parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
+    parser.add_argument('--checkpoint', type=str, help='[string/path] path to .pt model file.')
     parser.add_argument('--alpha', type=float, default=1., help='Parameter for controlling length regulator for speedup '
                                                                 'or slow-down of generated speech, e.g. alpha=2.0 is double-time')
     parser.add_argument('--amp', type=float, default=1., help='Parameter for controlling pitch amplification')
@@ -25,155 +46,85 @@ if __name__ == '__main__':
 
     # name of subcommand goes to args.vocoder
     subparsers = parser.add_subparsers(dest='vocoder')
-
-    wr_parser = subparsers.add_parser('wavernn', aliases=['wr'])
+    wr_parser = subparsers.add_parser('wavernn')
     wr_parser.add_argument('--batched', '-b', dest='batched', action='store_true', help='Fast Batched Generation')
     wr_parser.add_argument('--unbatched', '-u', dest='batched', action='store_false', help='Slow Unbatched Generation')
-    wr_parser.add_argument('--overlap', '-o', type=int, help='[int] number of crossover samples')
-    wr_parser.add_argument('--target', '-t', type=int, help='[int] number of samples in each batch index')
-    wr_parser.add_argument('--voc_weights', type=str, help='[string/path] Load in different WaveRNN weights')
+    wr_parser.add_argument('--overlap', '-o', default=550,  type=int, help='[int] number of crossover samples')
+    wr_parser.add_argument('--target', '-t', default=11_000, type=int, help='[int] number of samples in each batch index')
+    wr_parser.add_argument('--voc_checkpoint', type=str, help='[string/path] Load in different WaveRNN weights')
     wr_parser.set_defaults(batched=None)
 
-    gl_parser = subparsers.add_parser('griffinlim', aliases=['gl'])
-    gl_parser.add_argument('--iters', type=int, default=32, help='[int] number of griffinlim iterations')
-
-    mg_parser = subparsers.add_parser('melgan', aliases=['mg'])
+    gl_parser = subparsers.add_parser('griffinlim')
+    mg_parser = subparsers.add_parser('melgan')
 
     args = parser.parse_args()
 
-    if args.vocoder in ['griffinlim', 'gl']:
-        args.vocoder = 'griffinlim'
-    elif args.vocoder in ['wavernn', 'wr']:
-        args.vocoder = 'wavernn'
-    elif args.vocoder in ['melgan', 'mg']:
-        args.vocoder = 'melgan'
-    else:
-        raise argparse.ArgumentError('Must provide a valid vocoder type!')
+    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan'}, \
+        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\']'
 
-    hp.configure(args.hp_file)  # Load hparams from file
-    # set defaults for any arguments that depend on hparams
+    checkpoint_path = args.checkpoint
+    if checkpoint_path is None:
+        config = read_config(args.config)
+        paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
+        checkpoint_path = paths.forward_checkpoints / 'latest_model.pt'
+
+    tts_model, config = load_forward_taco(checkpoint_path)
+    dsp = DSP.from_config(config)
+
+    voc_model, voc_dsp = None, None
     if args.vocoder == 'wavernn':
-        if args.target is None:
-            args.target = hp.voc_target
-        if args.overlap is None:
-            args.overlap = hp.voc_overlap
-        if args.batched is None:
-            args.batched = hp.voc_gen_batched
+        voc_model, voc_config = load_wavernn(args.voc_checkpoint)
+        voc_dsp = DSP.from_config(voc_config)
 
-        batched = args.batched
-        target = args.target
-        overlap = args.overlap
-
-    input_text = args.input_text
-    tts_weights = args.tts_weights
-    save_attn = args.save_attn
-
-    paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
-
-    if not args.force_cpu and torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
+    out_path = Path('model_outputs')
+    out_path.mkdir(parents=True, exist_ok=True)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    tts_model.to(device)
     print('Using device:', device)
 
-    if args.vocoder == 'wavernn':
-        print('\nInitialising WaveRNN Model...\n')
-        # Instantiate WaveRNN Model
-        voc_model = WaveRNN(rnn_dims=hp.voc_rnn_dims,
-                            fc_dims=hp.voc_fc_dims,
-                            bits=hp.bits,
-                            pad=hp.voc_pad,
-                            upsample_factors=hp.voc_upsample_factors,
-                            feat_dims=hp.num_mels,
-                            compute_dims=hp.voc_compute_dims,
-                            res_out_dims=hp.voc_res_out_dims,
-                            res_blocks=hp.voc_res_blocks,
-                            hop_length=hp.hop_length,
-                            sample_rate=hp.sample_rate,
-                            mode=hp.voc_mode).to(device)
+    cleaner = Cleaner.from_config(config)
+    tokenizer = Tokenizer()
 
-        voc_load_path = args.voc_weights if args.voc_weights else paths.voc_latest_weights
-        voc_model.load(voc_load_path)
-
-    print('\nInitialising Forward TTS Model...\n')
-    tts_model = ForwardTacotron(embed_dims=hp.forward_embed_dims,
-                                num_chars=len(phonemes),
-                                durpred_rnn_dims=hp.forward_durpred_rnn_dims,
-                                durpred_conv_dims=hp.forward_durpred_conv_dims,
-                                durpred_dropout=hp.forward_durpred_dropout,
-                                pitch_rnn_dims=hp.forward_pitch_rnn_dims,
-                                pitch_conv_dims=hp.forward_pitch_conv_dims,
-                                pitch_dropout=hp.forward_pitch_dropout,
-                                pitch_emb_dims=hp.forward_pitch_emb_dims,
-                                pitch_proj_dropout=hp.forward_pitch_proj_dropout,
-                                rnn_dim=hp.forward_rnn_dims,
-                                postnet_k=hp.forward_postnet_K,
-                                postnet_dims=hp.forward_postnet_dims,
-                                prenet_k=hp.forward_prenet_K,
-                                prenet_dims=hp.forward_prenet_dims,
-                                highways=hp.forward_num_highways,
-                                dropout=hp.forward_dropout,
-                                n_mels=hp.num_mels).to(device)
-
-    tts_load_path = tts_weights if tts_weights else paths.forward_latest_weights
-    tts_model.load(tts_load_path)
-
-    if input_text:
-        text = clean_text(input_text.strip())
-        inputs = [text_to_sequence(text)]
+    if args.input_text:
+        texts = [args.input_text]
     else:
-        with open('sentences.txt') as f:
-            inputs = [clean_text(l.strip()) for l in f]
-        inputs = [text_to_sequence(t) for t in inputs]
+        with open('sentences.txt', 'r', encoding='utf-8') as f:
+            texts = f.readlines()
 
+    inputs = [tokenizer(cleaner(t)) for t in texts]
     tts_k = tts_model.get_step() // 1000
 
-    if args.vocoder == 'wavernn':
-        voc_k = voc_model.get_step() // 1000
+    if args.vocoder == 'griffinlim':
         simple_table([('Forward Tacotron', str(tts_k) + 'k'),
-                    ('Vocoder Type', 'WaveRNN'),
-                    ('WaveRNN', str(voc_k) + 'k'),
-                    ('Generation Mode', 'Batched' if batched else 'Unbatched'),
-                    ('Target Samples', target if batched else 'N/A'),
-                    ('Overlap Samples', overlap if batched else 'N/A')])
-
-    elif args.vocoder == 'griffinlim':
-        simple_table([('Forward Tacotron', str(tts_k) + 'k'),
-                      ('Vocoder Type', 'Griffin-Lim'),
-                      ('GL Iters', args.iters)])
+                      ('Vocoder Type', 'Griffin-Lim')])
 
     elif args.vocoder == 'melgan':
         simple_table([('Forward Tacotron', str(tts_k) + 'k'),
-                    ('Vocoder Type', 'MelGAN')])
+                      ('Vocoder Type', 'MelGAN')])
 
-    # simpla amplification of pitch
+    # simple amplification of pitch
     pitch_function = lambda x: x * args.amp
 
     for i, x in enumerate(inputs, 1):
 
+        wav_name = f'{i}_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
+
         print(f'\n| Generating {i}/{len(inputs)}')
-        _, m, dur, pitch = tts_model.generate(x, alpha=args.alpha, pitch_function=pitch_function)
-
-        if args.vocoder == 'griffinlim':
-            v_type = args.vocoder
-        elif args.vocoder == 'wavernn' and args.batched:
-            v_type = 'wavernn_batched'
-        else:
-            v_type = 'wavernn_unbatched'
-
-        if input_text:
-            save_path = paths.forward_output/f'{input_text[:10]}_{args.alpha}_{v_type}_{tts_k}k_amp{args.amp}.wav'
-        else:
-            save_path = paths.forward_output/f'{i}_{v_type}_{tts_k}k_alpha{args.alpha}_amp{args.amp}.wav'
-
-        if args.vocoder == 'wavernn':
-            m = torch.tensor(m).unsqueeze(0)
-            voc_model.generate(m, save_path, batched, hp.voc_target, hp.voc_overlap, hp.mu_law)
+        _, m, dur, pitch = tts_model.generate(x=x, alpha=args.alpha,
+                                              pitch_function=pitch_function)
         if args.vocoder == 'melgan':
             m = torch.tensor(m).unsqueeze(0)
-            torch.save(m, paths.forward_output/f'{i}_{tts_k}_alpha{args.alpha}_amp{args.amp}.mel')
+            torch.save(m, out_path / f'{wav_name}.mel')
+        if args.vocoder == 'wavernn':
+            m = torch.tensor(m).unsqueeze(0)
+            wav = voc_model.generate(mels=m,
+                                     batched=args.batched,
+                                     target=args.target,
+                                     overlap=args.overlap,
+                                     mu_law=voc_dsp.mu_law)
+            torch.save(m, out_path / f'{wav_name}.mel')
         elif args.vocoder == 'griffinlim':
-            wav = reconstruct_waveform(m, n_iter=args.iters)
-            save_wav(wav, save_path)
+            wav = dsp.griffinlim(m)
+            dsp.save_wav(wav, out_path / f'{wav_name}.wav')
 
     print('\n\nDone.\n')

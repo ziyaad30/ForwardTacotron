@@ -42,7 +42,7 @@ def create_gta_features(model: Tacotron,
 
 
 if __name__ == '__main__':
-    # Parse Arguments
+
     parser = argparse.ArgumentParser(description='Train ForwardTacotron TTS')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
