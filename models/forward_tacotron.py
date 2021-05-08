@@ -137,12 +137,16 @@ class ForwardTacotron(nn.Module):
                                           conv_dims=pitch_conv_dims,
                                           rnn_dims=pitch_rnn_dims,
                                           dropout=pitch_dropout)
+        self.energy_pred = SeriesPredictor(embed_dims,
+                                          conv_dims=pitch_conv_dims,
+                                          rnn_dims=pitch_rnn_dims,
+                                          dropout=pitch_dropout)
         self.prenet = CBHG(K=prenet_k,
                            in_channels=embed_dims,
                            channels=prenet_dims,
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=num_highways)
-        self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims + pitch_emb_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -160,6 +164,10 @@ class ForwardTacotron(nn.Module):
             self.pitch_proj = nn.Sequential(
                 nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
                 nn.Dropout(pitch_proj_dropout))
+        if pitch_emb_dims > 0:
+            self.energy_proj = nn.Sequential(
+                nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
+                nn.Dropout(pitch_proj_dropout))
 
     def forward(self, batch: Dict[str, torch.tensor]) -> Dict[str, torch.tensor]:
         x = batch['x']
@@ -167,6 +175,7 @@ class ForwardTacotron(nn.Module):
         dur = batch['dur']
         mel_lens = batch['mel_len']
         pitch = batch['pitch']
+        energy = batch['pitch']
 
         if self.training:
             self.step += 1
@@ -174,7 +183,7 @@ class ForwardTacotron(nn.Module):
         x = self.embedding(x)
         dur_hat = self.dur_pred(x).squeeze()
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        pitch = pitch.unsqueeze(1)
+        energy_hat = self.energy_pred(x).transpose(1, 2)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -183,6 +192,11 @@ class ForwardTacotron(nn.Module):
             pitch_proj = self.pitch_proj(pitch)
             pitch_proj = pitch_proj.transpose(1, 2)
             x = torch.cat([x, pitch_proj], dim=-1)
+
+        if self.pitch_emb_dims > 0:
+            energy_proj = self.energy_proj(energy_hat)
+            energy_proj = energy_proj.transpose(1, 2)
+            x = torch.cat([x, energy_proj], dim=-1)
 
         x = self.lr(x, dur)
         for i in range(x.size(0)):
@@ -204,7 +218,7 @@ class ForwardTacotron(nn.Module):
         x = self.pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat}
+                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat}
 
     def generate(self,
                  x: torch.tensor,
@@ -219,12 +233,18 @@ class ForwardTacotron(nn.Module):
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         pitch_hat = pitch_function(pitch_hat)
 
+        energy_hat = self.energy_pred(x).transpose(1, 2)
+
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
         if self.pitch_emb_dims > 0:
             pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
             x = torch.cat([x, pitch_hat_proj], dim=-1)
+
+        if self.pitch_emb_dims > 0:
+            energy_hat_proj = self.energy_proj(energy_hat).transpose(1, 2)
+            x = torch.cat([x, energy_hat_proj], dim=-1)
 
         x = self.lr(x, dur)
 
@@ -244,7 +264,7 @@ class ForwardTacotron(nn.Module):
         x_post = x_post.cpu().data.numpy()
         dur = dur.cpu().data.numpy()
 
-        return x, x_post, dur, pitch_hat
+        return x, x_post, dur, pitch_hat, energy_hat
 
     def pad(self, x, max_len):
         x = x[:, :, :max_len]

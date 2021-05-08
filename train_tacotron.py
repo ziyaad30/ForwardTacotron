@@ -34,22 +34,31 @@ def normalize_pitch(phoneme_pitches):
 
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
-def extract_pitch(save_path: Path, pitch_max_freq: float) -> Tuple[float, float]:
+def extract_pitch(save_path: Path,
+                  save_path_energy: Path,
+                  pitch_max_freq: float) -> Tuple[float, float]:
     train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
     val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
     all_data = train_data + val_data
     phoneme_pitches = []
+    phoneme_energies = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
         dur = np.load(paths.alg / f'{item_id}.npy')
+        mel = np.load(paths.mel / f'{item_id}.npy')
+        energy = np.linalg.norm(mel, axis=0, ord=2)
         assert np.sum(dur) == mel_len
         pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
         durs_cum = np.cumsum(np.pad(dur, (1, 0)))
-        pitch_char = np.zeros((dur.shape[0],), dtype=np.float)
+        pitch_char = np.zeros((dur.shape[0],), dtype=np.float32)
+        energy_char = np.zeros((dur.shape[0],), dtype=np.float32)
         for idx, a, b in zip(range(mel_len), durs_cum[:-1], durs_cum[1:]):
             values = pitch[a:b][np.where(pitch[a:b] != 0.0)[0]]
             values = values[np.where(values < pitch_max_freq)[0]]
             pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
+            energy_values = energy[a:b]
+            energy_char[idx] = np.mean(energy_values)
         phoneme_pitches.append((item_id, pitch_char))
+        phoneme_energies.append((item_id, energy_char))
         bar = progbar(prog_idx, len(all_data))
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
@@ -59,6 +68,14 @@ def extract_pitch(save_path: Path, pitch_max_freq: float) -> Tuple[float, float]
         np.save(str(save_path / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
     print(f'\nPitch mean: {mean} var: {var}')
+
+    mean, var = normalize_pitch(phoneme_energies)
+    for item_id, phoneme_energy in phoneme_energies:
+        print(phoneme_energy)
+        np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
+
+    print(f'\nEnergy mean: {mean} var: {var}')
+
     return mean, var
 
 
@@ -139,7 +156,9 @@ if __name__ == '__main__':
 
     if args.extract_pitch:
         print('Extracting Pitch Values...')
-        mean, var = extract_pitch(paths.phon_pitch, pitch_max_freq=dsp.pitch_max_freq)
+        mean, var = extract_pitch(save_path=paths.phon_pitch,
+                                  save_path_energy=paths.phon_energy,
+                                  pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 

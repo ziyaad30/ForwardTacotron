@@ -264,8 +264,9 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
     def __len__(self):
         return len(self.metadata)
@@ -306,9 +307,13 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = np.stack(pitch)
         pitch = torch.tensor(pitch).float()
+    if 'energy' in batch[0]:
+        energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
+        energy = np.stack(energy)
+        energy = torch.tensor(energy).float()
 
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
-            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch}
+            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
 
 class BinnedLengthSampler(Sampler):
