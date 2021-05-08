@@ -117,6 +117,11 @@ class ForwardTacotron(nn.Module):
                  pitch_dropout: float,
                  pitch_emb_dims: int,
                  pitch_proj_dropout: float,
+                 energy_conv_dims: int,
+                 energy_rnn_dims: int,
+                 energy_dropout: float,
+                 energy_emb_dims: int,
+                 energy_proj_dropout: float,
                  rnn_dims: int,
                  prenet_k: int,
                  prenet_dims: int,
@@ -138,15 +143,15 @@ class ForwardTacotron(nn.Module):
                                           rnn_dims=pitch_rnn_dims,
                                           dropout=pitch_dropout)
         self.energy_pred = SeriesPredictor(embed_dims,
-                                          conv_dims=pitch_conv_dims,
-                                          rnn_dims=pitch_rnn_dims,
-                                          dropout=pitch_dropout)
+                                           conv_dims=energy_conv_dims,
+                                           rnn_dims=energy_rnn_dims,
+                                           dropout=energy_dropout)
         self.prenet = CBHG(K=prenet_k,
                            in_channels=embed_dims,
                            channels=prenet_dims,
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=num_highways)
-        self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims + pitch_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + pitch_emb_dims + energy_emb_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -160,14 +165,15 @@ class ForwardTacotron(nn.Module):
         self.dropout = dropout
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_emb_dims = pitch_emb_dims
+        self.energy_emb_dims = energy_emb_dims
         if pitch_emb_dims > 0:
             self.pitch_proj = nn.Sequential(
                 nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
                 nn.Dropout(pitch_proj_dropout))
-        if pitch_emb_dims > 0:
+        if energy_emb_dims > 0:
             self.energy_proj = nn.Sequential(
-                nn.Conv1d(1, pitch_emb_dims, kernel_size=3, padding=1),
-                nn.Dropout(pitch_proj_dropout))
+                nn.Conv1d(1, energy_emb_dims, kernel_size=3, padding=1),
+                nn.Dropout(energy_proj_dropout))
 
     def forward(self, batch: Dict[str, torch.tensor]) -> Dict[str, torch.tensor]:
         x = batch['x']
@@ -193,7 +199,7 @@ class ForwardTacotron(nn.Module):
             pitch_proj = pitch_proj.transpose(1, 2)
             x = torch.cat([x, pitch_proj], dim=-1)
 
-        if self.pitch_emb_dims > 0:
+        if self.energy_emb_dims > 0:
             energy_proj = self.energy_proj(energy)
             energy_proj = energy_proj.transpose(1, 2)
             x = torch.cat([x, energy_proj], dim=-1)
@@ -223,7 +229,10 @@ class ForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.tensor,
                  alpha=1.0,
-                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> tuple:
+                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
+                 energy_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
+
+                 ) -> tuple:
         self.eval()
 
         x = self.embedding(x)
@@ -234,6 +243,7 @@ class ForwardTacotron(nn.Module):
         pitch_hat = pitch_function(pitch_hat)
 
         energy_hat = self.energy_pred(x).transpose(1, 2)
+        energy_hat = energy_function(energy_hat)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -242,7 +252,7 @@ class ForwardTacotron(nn.Module):
             pitch_hat_proj = self.pitch_proj(pitch_hat).transpose(1, 2)
             x = torch.cat([x, pitch_hat_proj], dim=-1)
 
-        if self.pitch_emb_dims > 0:
+        if self.energy_emb_dims > 0:
             energy_hat_proj = self.energy_proj(energy_hat).transpose(1, 2)
             x = torch.cat([x, energy_hat_proj], dim=-1)
 

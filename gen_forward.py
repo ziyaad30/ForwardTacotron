@@ -101,17 +101,22 @@ if __name__ == '__main__':
 
     # simple amplification of pitch
     pitch_function = lambda x: x * args.amp
+    energy_function = lambda x: -x
 
     for i, x in enumerate(texts, 1):
         print(f'\n| Generating {i}/{len(texts)}')
+        text = x
         x = cleaner(x)
         x = tokenizer(x)
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
-        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
+        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}_n'
 
-        _, m, dur, pitch = tts_model.generate(x=x, alpha=args.alpha,
-                                              pitch_function=pitch_function)
+        _, m, dur, pitch, energy = tts_model.generate(x=x, alpha=args.alpha,
+                                                      pitch_function=pitch_function,
+                                                      energy_function=energy_function)
+        for c, e in zip(text, energy.squeeze().tolist()):
+            print(f'{c} {e}')
         if args.vocoder == 'melgan':
             m = torch.tensor(m).unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')

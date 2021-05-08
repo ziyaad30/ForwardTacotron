@@ -27,7 +27,7 @@ class ForwardTrainer:
         self.dsp = dsp
         self.config = config
         self.train_cfg = config['forward_tacotron']['training']
-        self.writer = SummaryWriter(log_dir='/home/sysgen/chris/workspace/ForwardTacotron/checkpoints/energy', comment='v1')
+        self.writer = SummaryWriter(log_dir='/home/sysgen/chris/workspace/ForwardTacotron3/checkpoints/energy', comment='v1')
         self.l1_loss = MaskedL1()
 
     def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
