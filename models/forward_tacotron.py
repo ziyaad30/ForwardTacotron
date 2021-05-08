@@ -174,8 +174,8 @@ class ForwardTacotron(nn.Module):
         mel = batch['mel']
         dur = batch['dur']
         mel_lens = batch['mel_len']
-        pitch = batch['pitch']
-        energy = batch['pitch']
+        pitch = batch['pitch'].unsqueeze(1)
+        energy = batch['energy'].unsqueeze(1)
 
         if self.training:
             self.step += 1
@@ -194,7 +194,7 @@ class ForwardTacotron(nn.Module):
             x = torch.cat([x, pitch_proj], dim=-1)
 
         if self.pitch_emb_dims > 0:
-            energy_proj = self.energy_proj(energy_hat)
+            energy_proj = self.energy_proj(energy)
             energy_proj = energy_proj.transpose(1, 2)
             x = torch.cat([x, energy_proj], dim=-1)
 
