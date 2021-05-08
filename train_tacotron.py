@@ -20,7 +20,7 @@ from utils.metrics import attention_score
 from utils.paths import Paths
 
 
-def normalize_pitch(phoneme_pitches):
+def normalize_values(phoneme_pitches):
     nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
                                for item_id, v in phoneme_pitches])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
@@ -34,9 +34,9 @@ def normalize_pitch(phoneme_pitches):
 
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
-def extract_pitch(save_path: Path,
-                  save_path_energy: Path,
-                  pitch_max_freq: float) -> Tuple[float, float]:
+def extract_pitch_energy(save_path_pitch: Path,
+                         save_path_energy: Path,
+                         pitch_max_freq: float) -> Tuple[float, float]:
     train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
     val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
     all_data = train_data + val_data
@@ -63,13 +63,13 @@ def extract_pitch(save_path: Path,
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
 
-    mean, var = normalize_pitch(phoneme_pitches)
+    mean, var = normalize_values(phoneme_pitches)
     for item_id, phoneme_pitch in phoneme_pitches:
-        np.save(str(save_path / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
+        np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
     print(f'\nPitch mean: {mean} var: {var}')
 
-    mean, var = normalize_pitch(phoneme_energies)
+    mean, var = normalize_values(phoneme_energies)
     for item_id, phoneme_energy in phoneme_energies:
         print(phoneme_energy)
         np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
@@ -139,7 +139,7 @@ def create_align_features(model: Tacotron,
         stream(msg)
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('Extracting Pitch Values...')
-    extract_pitch(save_path_pitch, pitch_max_freq)
+    extract_pitch_energy(save_path_pitch, pitch_max_freq)
 
 
 if __name__ == '__main__':
@@ -156,9 +156,9 @@ if __name__ == '__main__':
 
     if args.extract_pitch:
         print('Extracting Pitch Values...')
-        mean, var = extract_pitch(save_path=paths.phon_pitch,
-                                  save_path_energy=paths.phon_energy,
-                                  pitch_max_freq=dsp.pitch_max_freq)
+        mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
+                                         save_path_energy=paths.phon_energy,
+                                         pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 

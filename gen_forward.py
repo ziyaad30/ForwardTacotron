@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     # simple amplification of pitch
     pitch_function = lambda x: x * args.amp
-    energy_function = lambda x: -x
+    energy_function = lambda x: x
 
     for i, x in enumerate(texts, 1):
         print(f'\n| Generating {i}/{len(texts)}')
