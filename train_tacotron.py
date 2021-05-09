@@ -33,7 +33,8 @@ def normalize_pitch(phoneme_pitches):
 
 
 def normalize_energy(energies):
-    concat = np.concatenate([v for item_id, v in energies])
+    concat = np.concatenate([v for item_id, v in energies
+                             if not np.isnan(np.mean(v))])
     mean, std = np.mean(concat), np.std(concat)
     for item_id, v in energies:
         v -= mean
