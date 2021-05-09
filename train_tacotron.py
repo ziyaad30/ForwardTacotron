@@ -20,25 +20,17 @@ from utils.metrics import attention_score
 from utils.paths import Paths
 
 
-def normalize_pitch(phoneme_pitches):
+def normalize_values(phoneme_val):
     nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
-                               for item_id, v in phoneme_pitches])
+                               for item_id, v in phoneme_val])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
-    for item_id, v in phoneme_pitches:
+    for item_id, v in phoneme_val:
         zero_idxs = np.where(v == 0.0)[0]
         v -= mean
         v /= std
         v[zero_idxs] = 0.0
     return mean, std
 
-
-def normalize_energy(energies):
-    concat = np.concatenate([v for item_id, v in energies])
-    mean, std = np.mean(concat), np.std(concat)
-    for item_id, v in energies:
-        v -= mean
-        v /= std
-    return mean, std
 
 
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
@@ -72,15 +64,14 @@ def extract_pitch_energy(save_path_pitch: Path,
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
 
-    mean, var = normalize_pitch(phoneme_pitches)
+    mean, var = normalize_values(phoneme_pitches)
     for item_id, phoneme_pitch in phoneme_pitches:
         np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
     print(f'\nPitch mean: {mean} var: {var}')
 
-    mean, var = normalize_energy(phoneme_energies)
+    mean, var = normalize_values(phoneme_energies)
     for item_id, phoneme_energy in phoneme_energies:
-        print(phoneme_energy)
         np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
 
     print(f'\nEnergy mean: {mean} var: {var}')
