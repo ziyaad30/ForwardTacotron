@@ -33,8 +33,7 @@ def normalize_pitch(phoneme_pitches):
 
 
 def normalize_energy(energies):
-    concat = np.concatenate([v for item_id, v in energies
-                             if not np.isnan(np.mean(v))])
+    concat = np.concatenate([v for item_id, v in energies])
     mean, std = np.mean(concat), np.std(concat)
     for item_id, v in energies:
         v -= mean
@@ -66,7 +65,7 @@ def extract_pitch_energy(save_path_pitch: Path,
             values = values[np.where(values < pitch_max_freq)[0]]
             pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
             energy_values = energy[a:b]
-            energy_char[idx] = np.mean(energy_values)
+            energy_char[idx] = np.mean(energy_values)if len(energy_values) > 0 else 0.0
         phoneme_pitches.append((item_id, pitch_char))
         phoneme_energies.append((item_id, energy_char))
         bar = progbar(prog_idx, len(all_data))
