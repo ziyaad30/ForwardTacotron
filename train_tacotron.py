@@ -20,7 +20,7 @@ from utils.metrics import attention_score
 from utils.paths import Paths
 
 
-def normalize_values(phoneme_pitches):
+def normalize_pitch(phoneme_pitches):
     nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
                                for item_id, v in phoneme_pitches])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
@@ -29,6 +29,15 @@ def normalize_values(phoneme_pitches):
         v -= mean
         v /= std
         v[zero_idxs] = 0.0
+    return mean, std
+
+
+def normalize_energy(energies):
+    energies = np.concatenate([v for item_id, v in energies])
+    mean, std = np.mean(energies), np.std(energies)
+    for item_id, v in energies:
+        v -= mean
+        v /= std
     return mean, std
 
 
@@ -45,7 +54,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
         dur = np.load(paths.alg / f'{item_id}.npy')
         mel = np.load(paths.mel / f'{item_id}.npy')
-        energy = np.linalg.norm(mel, axis=0, ord=2)
+        energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
         assert np.sum(dur) == mel_len
         pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
         durs_cum = np.cumsum(np.pad(dur, (1, 0)))
@@ -63,13 +72,13 @@ def extract_pitch_energy(save_path_pitch: Path,
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
 
-    mean, var = normalize_values(phoneme_pitches)
+    mean, var = normalize_pitch(phoneme_pitches)
     for item_id, phoneme_pitch in phoneme_pitches:
         np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
     print(f'\nPitch mean: {mean} var: {var}')
 
-    mean, var = normalize_values(phoneme_energies)
+    mean, var = normalize_energy(phoneme_energies)
     for item_id, phoneme_energy in phoneme_energies:
         print(phoneme_energy)
         np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
