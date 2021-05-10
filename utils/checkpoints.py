@@ -20,7 +20,7 @@ def save_checkpoint(model: torch.nn.Module,
 def restore_checkpoint(model: Union[ForwardTacotron, Tacotron, WaveRNN],
                        optim: torch.optim.Optimizer,
                        path: Path,
-                       device=torch.device) -> None:
+                       device: torch.device) -> None:
     if path.is_file():
         checkpoint = torch.load(path, map_location=device)
         model.load_state_dict(checkpoint['model'])
