@@ -82,7 +82,7 @@ if __name__ == '__main__':
     cleaner = Cleaner.from_config(config)
     tokenizer = Tokenizer()
 
-    print('Using device:', device)
+    print(f'Using device: {device}\n')
     if args.input_text:
         texts = [args.input_text]
     else:
@@ -91,13 +91,8 @@ if __name__ == '__main__':
 
     tts_k = tts_model.get_step() // 1000
 
-    if args.vocoder == 'griffinlim':
-        simple_table([('Forward Tacotron', str(tts_k) + 'k'),
-                      ('Vocoder Type', 'Griffin-Lim')])
-
-    elif args.vocoder == 'melgan':
-        simple_table([('Forward Tacotron', str(tts_k) + 'k'),
-                      ('Vocoder Type', 'MelGAN')])
+    simple_table([('Forward Tacotron', str(tts_k) + 'k'),
+                  ('Vocoder Type', args.vocoder)])
 
     # simple amplification of pitch
     pitch_function = lambda x: x * args.amp

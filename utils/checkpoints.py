@@ -6,7 +6,6 @@ import torch.optim.optimizer
 from models.deepmind_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
-from utils.paths import Paths
 
 
 def save_checkpoint(model: torch.nn.Module,

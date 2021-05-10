@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pathlib import Path
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, Tuple
 
 from models.common_layers import CBHG
 from utils.text.symbols import phonemes
@@ -175,8 +175,19 @@ class Decoder(nn.Module):
 
 class Tacotron(nn.Module):
 
-    def __init__(self, embed_dims, num_chars, encoder_dims, decoder_dims, n_mels, postnet_dims,
-                 encoder_k, lstm_dims, postnet_k, num_highways, dropout, stop_threshold):
+    def __init__(self,
+                 embed_dims: int,
+                 num_chars: int,
+                 encoder_dims: int,
+                 decoder_dims: int,
+                 n_mels: int,
+                 postnet_dims: int,
+                 encoder_k: int,
+                 lstm_dims: int,
+                 postnet_k: int,
+                 num_highways: int,
+                 dropout: float,
+                 stop_threshold: float) -> None:
         super().__init__()
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
@@ -189,20 +200,19 @@ class Tacotron(nn.Module):
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
 
         self.init_model()
-        self.num_params()
 
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.register_buffer('stop_threshold', torch.tensor(stop_threshold, dtype=torch.float32))
 
     @property
-    def r(self):
+    def r(self) -> int:
         return self.decoder.r.item()
 
     @r.setter
-    def r(self, value):
+    def r(self, value: int) -> None:
         self.decoder.r = self.decoder.r.new_tensor(value, requires_grad=False)
 
-    def forward(self, x, m, generate_gta=False):
+    def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
         device = next(self.parameters()).device  # use same device as parameters
 
         if self.training:
@@ -258,7 +268,7 @@ class Tacotron(nn.Module):
 
         return mel_outputs, linear, attn_scores
 
-    def generate(self, x: torch.tensor, steps=2000):
+    def generate(self, x: torch.tensor, steps=2000) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
         self.eval()
         device = next(self.parameters()).device  # use same device as parameters
 
@@ -329,34 +339,6 @@ class Tacotron(nn.Module):
     def reset_step(self):
         # assignment to parameters or buffers is overloaded, updates internal dict entry
         self.step = self.step.data.new_tensor(1)
-
-    def log(self, path, msg):
-        with open(path, 'a') as f:
-            print(msg, file=f)
-
-    def load(self, path: Union[str, Path]):
-        # Use device of model params as location for loaded state
-        device = next(self.parameters()).device
-        state_dict = torch.load(path, map_location=device)
-
-        # Backwards compatibility with old saved models
-        if 'r' in state_dict and not 'decoder.r' in state_dict:
-            self.r = state_dict['r']
-
-        self.load_state_dict(state_dict, strict=False)
-
-    def save(self, path: Union[str, Path]):
-        # No optimizer argument because saving a model should not include data
-        # only relevant in the training process - it should only be properties
-        # of the model itself. Let caller take care of saving optimzier state.
-        torch.save(self.state_dict(), path)
-
-    def num_params(self, print_out=True):
-        parameters = filter(lambda p: p.requires_grad, self.parameters())
-        parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
-        if print_out:
-            print('Trainable Parameters: %.3fM' % parameters)
-        return parameters
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'Tacotron':

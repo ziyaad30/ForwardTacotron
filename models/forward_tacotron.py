@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, List, Dict, Any
+from typing import Union, Callable, List, Dict, Any, Tuple
 
 import numpy as np
 
@@ -22,7 +22,7 @@ class LengthRegulator(nn.Module):
         return self.expand(x, dur)
 
     @staticmethod
-    def build_index(duration, x):
+    def build_index(duration: torch.tensor, x: torch.tensor) -> torch.tensor:
         duration[duration < 0] = 0
         tot_duration = duration.cumsum(1).detach().cpu().numpy().astype('int')
         max_duration = int(tot_duration.max().item())
@@ -37,7 +37,7 @@ class LengthRegulator(nn.Module):
             index[i, pos:, :] = j
         return torch.LongTensor(index).to(duration.device)
 
-    def expand(self, x, dur):
+    def expand(self, x: torch.tensor, dur: torch.tensor) -> torch.tensor:
         idx = self.build_index(dur, x)
         y = torch.gather(x, 1, idx)
         return y
@@ -45,7 +45,7 @@ class LengthRegulator(nn.Module):
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, in_dims, conv_dims=256, rnn_dims=64, dropout=0.5):
+    def __init__(self, in_dims, conv_dims=256, rnn_dims=64, dropout=0.5) -> None:
         super().__init__()
         self.convs = torch.nn.ModuleList([
             BatchNormConv(in_dims, conv_dims, 5, activation=torch.relu),
@@ -56,7 +56,7 @@ class SeriesPredictor(nn.Module):
         self.lin = nn.Linear(2 * rnn_dims, 1)
         self.dropout = dropout
 
-    def forward(self, x, alpha=1.0):
+    def forward(self, x: torch.tensor, alpha=1.0) -> torch.tensor:
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -69,7 +69,7 @@ class SeriesPredictor(nn.Module):
 
 class ConvResNet(nn.Module):
 
-    def __init__(self, in_dims, conv_dims=256):
+    def __init__(self, in_dims: int, conv_dims=256) -> None:
         super().__init__()
         self.first_conv = BatchNormConv(in_dims, conv_dims, 5, activation=torch.relu)
         self.convs = torch.nn.ModuleList([
@@ -77,7 +77,7 @@ class ConvResNet(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, activation=torch.relu),
         ])
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor) -> torch.tensor:
         x = x.transpose(1, 2)
         x = self.first_conv(x)
         for conv in self.convs:
@@ -90,13 +90,13 @@ class ConvResNet(nn.Module):
 
 class BatchNormConv(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel, activation=None):
+    def __init__(self, in_channels: int, out_channels: int, kernel: int, activation=None):
         super().__init__()
         self.conv = nn.Conv1d(in_channels, out_channels, kernel, stride=1, padding=kernel // 2, bias=False)
         self.bnorm = nn.BatchNorm1d(out_channels)
         self.activation = activation
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor) -> torch.tensor:
         x = self.conv(x)
         if self.activation:
             x = self.activation(x)
@@ -209,7 +209,8 @@ class ForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.tensor,
                  alpha=1.0,
-                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> tuple:
+                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) \
+            -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         self.eval()
 
         x = self.embedding(x)
@@ -246,29 +247,13 @@ class ForwardTacotron(nn.Module):
 
         return x, x_post, dur, pitch_hat
 
-    def pad(self, x, max_len):
+    def pad(self, x: torch.tensor, max_len: int) -> torch.tensor:
         x = x[:, :, :max_len]
         x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', -11.5129)
         return x
 
-    def get_step(self):
+    def get_step(self) -> int:
         return self.step.data.item()
-
-    def load(self, path: Union[str, Path]):
-        # Use device of model params as location for loaded state
-        device = next(self.parameters()).device
-        state_dict = torch.load(path, map_location=device)
-        self.load_state_dict(state_dict, strict=False)
-
-    def save(self, path: Union[str, Path]):
-        # No optimizer argument because saving a model should not include data
-        # only relevant in the training process - it should only be properties
-        # of the model itself. Let caller take care of saving optimzier state.
-        torch.save(self.state_dict(), path)
-
-    def log(self, path, msg):
-        with open(path, 'a') as f:
-            print(msg, file=f)
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'ForwardTacotron':
