@@ -165,6 +165,7 @@ def get_tts_datasets(path: Path,
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
+
     if model_type == 'tacotron':
         train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
                                     text_dict=text_dict, tokenizer=tokenizer)
@@ -199,11 +200,9 @@ def get_tts_datasets(path: Path,
 
 
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
-    dataset_filtered = []
-    for item_id, mel_len in dataset:
-        if mel_len <= max_mel_len:
-            dataset_filtered.append((item_id, mel_len))
-    return dataset_filtered
+    if max_mel_len is None:
+        return dataset
+    return [(id, len) for id, len in dataset if len <= max_mel_len]
 
 
 def filter_bad_attentions(dataset: List[tuple],

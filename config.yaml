@@ -129,6 +129,8 @@ forward_tacotron:
     schedule:
       - 1e-4,  150_000,  32   # progressive training schedule
       - 1e-5,  300_000,  32   # lr, step, batch_size
+    dur_loss_factor: 0.1
+    pitch_loss_factor: 0.1
 
     max_mel_len: 1250              # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0            # clips the gradient norm to prevent explosion - set to None if not needed

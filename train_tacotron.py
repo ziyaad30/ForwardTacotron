@@ -118,7 +118,7 @@ def create_align_features(model: Tacotron,
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         np.save(str(save_path_alg / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
-        msg = f'{bar} {i}/{iters} Batches '
+        msg = f'{bar} {i}/{iters} Files '
         stream(msg)
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('Extracting Pitch Values...')
@@ -166,7 +166,7 @@ if __name__ == '__main__':
     elif args.force_align:
         print('Creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=99_000,
+                                              max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
                               save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,
@@ -177,7 +177,7 @@ if __name__ == '__main__':
         trainer.train(model, optimizer)
         print('Creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=99_000,
+                                              max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
                               save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,

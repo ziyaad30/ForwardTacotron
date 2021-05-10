@@ -79,7 +79,10 @@ class ForwardTrainer:
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
 
-                loss = m1_loss + m2_loss + 0.1 * dur_loss + 0.1 * pitch_loss
+                loss = m1_loss + m2_loss \
+                       + self.train_cfg['dur_loss_factor'] * dur_loss \
+                       + self.train_cfg['pitch_loss_factor'] * pitch_loss
+
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
