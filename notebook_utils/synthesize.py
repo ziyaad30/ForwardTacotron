@@ -1,84 +1,65 @@
 import torch
+import numpy as np
 from typing import Callable
 
 from models.fatchord_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
-from utils.text.symbols import phonemes
-from utils.text import text_to_sequence, clean_text
-from utils.dsp import reconstruct_waveform
-from utils import hparams as hp
+from utils.dsp import DSP
+from utils.text.cleaners import Cleaner
+from utils.text.tokenizer import Tokenizer
 
 
-def init_hparams(hp_file):
-    hp.configure(hp_file)
+class Synthesizer:
+
+    def __init__(self,
+                 tts_path: str,
+                 voc_path: str,
+                 device='cuda'):
+        self.device = torch.device(device)
+        tts_checkpoint = torch.load(tts_path, map_location=self.device)
+        tts_config = tts_checkpoint['config']
+        tts_model = ForwardTacotron.from_config(tts_config)
+        tts_model.load_state_dict(tts_checkpoint['model'])
+        self.tts_model = tts_model
+        self.wavernn = WaveRNN.from_checkpoint(voc_path)
+        try:
+            self.melgan = torch.hub.load('seungwonpark/melgan', 'melgan').to(device).eval()
+        except Exception as e:
+            print(e)
+        self.cleaner = Cleaner.from_config(tts_config)
+        self.tokenizer = Tokenizer()
+        self.dsp = DSP.from_config(tts_config)
+
+    def __call__(self,
+                 text: str,
+                 voc_model: str,
+                 alpha=1.0,
+                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> np.array:
+        x = self.cleaner(text)
+        x = self.tokenizer(x)
+        x = torch.tensor(x).unsqueeze(0)
+        _, m, _, _ = self.tts_model.generate(x, alpha=alpha, pitch_function=pitch_function)
+        if voc_model == 'griffinlim':
+            wav = self.dsp.griffinlim(m, n_iter=32)
+        elif voc_model == 'wavernn':
+            m = torch.tensor(m).unsqueeze(0)
+            wav = self.wavernn.generate(mels=m,
+                                        batched=True,
+                                        target=11_000,
+                                        overlap=550,
+                                        mu_law=self.dsp.mu_law)
+        else:
+            m = torch.tensor(m).unsqueeze(0).cuda()
+            with torch.no_grad():
+                wav = voc_model.inference(m).cpu().numpy()
+        self.dsp.save_wav(wav, '/tmp/save.wav')
+        return wav
 
 
-def get_forward_model(model_path):
-    device = torch.device('cuda')
-    model = ForwardTacotron(embed_dims=hp.forward_embed_dims,
-                            num_chars=len(phonemes),
-                            durpred_rnn_dims=hp.forward_durpred_rnn_dims,
-                            durpred_conv_dims=hp.forward_durpred_conv_dims,
-                            durpred_dropout=hp.forward_durpred_dropout,
-                            pitch_rnn_dims=hp.forward_pitch_rnn_dims,
-                            pitch_conv_dims=hp.forward_pitch_conv_dims,
-                            pitch_dropout=hp.forward_pitch_dropout,
-                            pitch_emb_dims=hp.forward_pitch_emb_dims,
-                            pitch_proj_dropout=hp.forward_pitch_proj_dropout,
-                            rnn_dim=hp.forward_rnn_dims,
-                            postnet_k=hp.forward_postnet_K,
-                            postnet_dims=hp.forward_postnet_dims,
-                            prenet_k=hp.forward_prenet_K,
-                            prenet_dims=hp.forward_prenet_dims,
-                            highways=hp.forward_num_highways,
-                            dropout=hp.forward_dropout,
-                            n_mels=hp.num_mels).to(device)
-    model.load(model_path)
-    return model
+if __name__ == '__main__':
 
-
-def get_wavernn_model(model_path):
-    device = torch.device('cuda')
-    print()
-    model = WaveRNN(rnn_dims=hp.voc_rnn_dims,
-                    fc_dims=hp.voc_fc_dims,
-                    bits=hp.bits,
-                    pad=hp.voc_pad,
-                    upsample_factors=hp.voc_upsample_factors,
-                    feat_dims=hp.num_mels,
-                    compute_dims=hp.voc_compute_dims,
-                    res_out_dims=hp.voc_res_out_dims,
-                    res_blocks=hp.voc_res_blocks,
-                    hop_length=hp.hop_length,
-                    sample_rate=hp.sample_rate,
-                    mode=hp.voc_mode).to(device)
-
-    model.load(model_path)
-    return model
-
-
-def get_melgan_model():
-    vocoder = torch.hub.load('seungwonpark/melgan', 'melgan')
-    vocoder.cuda().eval()
-    return vocoder
-
-
-def synthesize(input_text: str,
-               tts_model: ForwardTacotron,
-               voc_model: torch.nn.Module,
-               alpha=1.0,
-               pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x):
-    text = clean_text(input_text.strip())
-    x = text_to_sequence(text)
-    _, m, _, _ = tts_model.generate(x, alpha=alpha, pitch_function=pitch_function)
-    if voc_model == 'griffinlim':
-        wav = reconstruct_waveform(m, n_iter=32)
-    elif isinstance(voc_model, WaveRNN):
-        m = torch.tensor(m).unsqueeze(0)
-        wav = voc_model.generate(m, '/tmp/sample.wav', True, hp.voc_target, hp.voc_overlap, hp.mu_law)
-    else:
-        m = torch.tensor(m).unsqueeze(0).cuda()
-        with torch.no_grad():
-            wav = voc_model.inference(m).cpu().numpy()
-    return wav
-
+    synthesizer = Synthesizer(tts_path='/Users/cschaefe/stream_tts_models/forward_taco_deep_phonemizer_nostress_bind_refactored/model.pt',
+                              voc_path='../pretrained/wave_575k.pt',
+                              device='cpu')
+    wav = synthesizer(text='ɪn eɪprəl, dʒɑːnsən wɑːz ɪn hɑːspɪtəl bɪkɔz hiː hæd koʊvɪd-naɪntiːn.', voc_model='wavernn')
+    print(wav)

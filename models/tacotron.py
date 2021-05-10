@@ -349,7 +349,7 @@ class Tacotron(nn.Module):
         return Tacotron(**model_config)
 
     @classmethod
-    def from_checkpoint(cls, path: Path) -> 'Tacotron':
+    def from_checkpoint(cls, path: Union[Path, str]) -> 'Tacotron':
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         model = Tacotron.from_config(checkpoint['config'])
         model.load_state_dict(checkpoint['model'])

@@ -263,7 +263,7 @@ class ForwardTacotron(nn.Module):
         return ForwardTacotron(**model_config)
 
     @classmethod
-    def from_checkpoint(cls, path: Path) -> 'ForwardTacotron':
+    def from_checkpoint(cls, path: Union[Path, str]) -> 'ForwardTacotron':
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         model = ForwardTacotron.from_config(checkpoint['config'])
         model.load_state_dict(checkpoint['model'])

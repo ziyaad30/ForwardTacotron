@@ -18,10 +18,10 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE (28.10.2020)
-- Added pitch conditioning similar to the one in [FastPitch](https://arxiv.org/abs/2006.06873), model converges now in about 50k steps (a couple hrs training).
-- Pitch can be manipulated in inference, e.g. with --amp 2.0 for larger pitch swings.
-- Try pitch manipulation with the newest model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb).
+## UPDATE (10.05.2020)
+- Major refactoring
+- Replaced hparams.py with config.yaml that is now stored in the model
+- When loading a model, the hyperparams are restored automatically
 
 ## 🔈 Samples
 
