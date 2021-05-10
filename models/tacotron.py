@@ -103,6 +103,7 @@ class Decoder(nn.Module):
     # Class variable because its value doesn't change between classes
     # yet ought to be scoped by class because its a property of a Decoder
     max_r = 20
+
     def __init__(self, n_mels, decoder_dims, lstm_dims):
         super().__init__()
         self.register_buffer('r', torch.tensor(1, dtype=torch.int))
@@ -114,7 +115,7 @@ class Decoder(nn.Module):
         self.res_rnn1 = nn.LSTMCell(lstm_dims, lstm_dims)
         self.res_rnn2 = nn.LSTMCell(lstm_dims, lstm_dims)
         self.mel_proj = nn.Linear(lstm_dims, n_mels * self.max_r, bias=False)
-
+    
     def zoneout(self, prev, current, p=0.1):
         device = next(self.parameters()).device  # Use same device as parameters
         mask = torch.zeros(prev.size(), device=device).bernoulli_(p)

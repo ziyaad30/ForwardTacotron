@@ -4,13 +4,14 @@ import torch.nn.functional as F
 
 
 class HighwayNetwork(nn.Module):
-    def __init__(self, size):
+
+    def __init__(self, size: int) -> None:
         super().__init__()
         self.W1 = nn.Linear(size, size)
         self.W2 = nn.Linear(size, size)
         self.W1.bias.data.fill_(0.)
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor) -> torch.tensor:
         x1 = self.W1(x)
         x2 = self.W2(x)
         g = torch.sigmoid(x2)
@@ -19,20 +20,30 @@ class HighwayNetwork(nn.Module):
 
 
 class BatchNormConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, relu=True):
+
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel: int, relu=True) -> None:
         super().__init__()
         self.conv = nn.Conv1d(in_channels, out_channels, kernel, stride=1, padding=kernel // 2, bias=False)
         self.bnorm = nn.BatchNorm1d(out_channels)
         self.relu = relu
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor) -> torch.tensor:
         x = self.conv(x)
         x = F.relu(x) if self.relu is True else x
         return self.bnorm(x)
 
 
 class CBHG(nn.Module):
-    def __init__(self, K, in_channels, channels, proj_channels, num_highways):
+
+    def __init__(self,
+                 K: int,
+                 in_channels: int,
+                 channels: int,
+                 proj_channels: int,
+                 num_highways: int) -> None:
         super().__init__()
 
         # List of all rnns to call `flatten_parameters()` on
@@ -67,7 +78,7 @@ class CBHG(nn.Module):
         # Avoid fragmentation of RNN parameters and associated warning
         self._flatten_parameters()
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor) -> torch.tensor:
         # Although we `_flatten_parameters()` on init, when using DataParallel
         # the model gets replicated, making it no longer guaranteed that the
         # weights are contiguous in GPU memory. Hence, we must call it again
