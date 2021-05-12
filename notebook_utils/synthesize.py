@@ -52,14 +52,4 @@ class Synthesizer:
             m = torch.tensor(m).unsqueeze(0).cuda()
             with torch.no_grad():
                 wav = self.melgan.inference(m).cpu().numpy()
-        self.dsp.save_wav(wav, '/tmp/save.wav')
         return wav
-
-
-if __name__ == '__main__':
-
-    synthesizer = Synthesizer(tts_path='/Users/cschaefe/stream_tts_models/forward_taco_deep_phonemizer_nostress_bind_refactored/model.pt',
-                              voc_path='../pretrained/wave_575k.pt',
-                              device='cpu')
-    wav = synthesizer(text='ɪn eɪprəl, dʒɑːnsən wɑːz ɪn hɑːspɪtəl bɪkɔz hiː hæd koʊvɪd-naɪntiːn.', voc_model='wavernn')
-    print(wav)
