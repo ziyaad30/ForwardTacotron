@@ -117,6 +117,15 @@ python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_h
 
 ```
 
+## Pretrained Models
+
+| Model | Dataset | Commit|
+|---|---|---|
+|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
+|[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
+
+
+
 ## Tips for training a WaveRNN model
 
 - From experience I recommend starting with the standard params (RAW mode with 9 bit), which

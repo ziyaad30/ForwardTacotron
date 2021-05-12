@@ -51,7 +51,7 @@ class Synthesizer:
         else:
             m = torch.tensor(m).unsqueeze(0).cuda()
             with torch.no_grad():
-                wav = voc_model.inference(m).cpu().numpy()
+                wav = self.melgan.inference(m).cpu().numpy()
         self.dsp.save_wav(wav, '/tmp/save.wav')
         return wav
 
