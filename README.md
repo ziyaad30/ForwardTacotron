@@ -109,21 +109,19 @@ Here is what the ForwardTacotron tensorboard looks like:
 </p>
 
 
-## Use the pretrained Models
-
-You can synthesize text using the pretrained models with
-```
-python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_hparams.py --tts_weights pretrained/forward_400K.pyt wavernn --voc_weights pretrained/wave_575K.pyt
-
-```
-
 ## Pretrained Models
 
-| Model | Dataset | Commit|
+| Model | Dataset | Commit |
 |---|---|---|
 |[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
 |[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
 
+
+After downloading the models you can synthesize text using the pretrained models with
+```
+python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt wavernn --voc_checkpoint wave_step_575k.pt
+
+```
 
 
 ## Tips for training a WaveRNN model
