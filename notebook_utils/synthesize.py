@@ -22,8 +22,8 @@ class Synthesizer:
         tts_model.load_state_dict(tts_checkpoint['model'])
         self.tts_model = tts_model
         self.wavernn = WaveRNN.from_checkpoint(voc_path)
-        melgan = torch.hub.load('seungwonpark/melgan', 'melgan').cuda().eval()
-        self.melgan = melgan
+        self.melgan = torch.hub.load('seungwonpark/melgan', 'melgan')
+        self.melgan.to(device).eval()
         self.cleaner = Cleaner.from_config(tts_config)
         self.tokenizer = Tokenizer()
         self.dsp = DSP.from_config(tts_config)
