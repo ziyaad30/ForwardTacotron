@@ -23,7 +23,7 @@ class Synthesizer:
         self.tts_model = tts_model
         self.wavernn = WaveRNN.from_checkpoint(voc_path)
         try:
-            self.melgan = torch.hub.load('seungwonpark/melgan', 'melgan').to(device).eval()
+            self.melgan = torch.hub.load('seungwonpark/melgan', 'melgan').cuda().eval()
         except Exception as e:
             print(e)
         self.cleaner = Cleaner.from_config(tts_config)
