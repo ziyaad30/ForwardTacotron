@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Tuple
 
 from utils.dsp import *
 from utils.files import unpickle_binary
@@ -17,12 +17,12 @@ from utils.text.tokenizer import Tokenizer
 
 class VocoderDataset(Dataset):
 
-    def __init__(self, path: Path, dataset_ids, train_gta=False):
+    def __init__(self, path: Path, dataset_ids, train_gta=False) -> None:
         self.metadata = dataset_ids
         self.mel_path = path/'gta' if train_gta else path/'mel'
         self.quant_path = path/'quant'
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Dict[str, np.array]:
         item_id = self.metadata[index]
         mel = np.load(self.mel_path/f'{item_id}.npy')
         x = np.load(self.quant_path/f'{item_id}.npy')
@@ -97,7 +97,7 @@ class VocCollator:
         self.voc_mode = voc_mode
         self.bits = bits
 
-    def __call__(self, batch: List[Dict[str, torch.tensor]]):
+    def __call__(self, batch: List[Dict[str, torch.tensor]]) -> Dict[str, torch.tensor]:
         mel_win = self.voc_seq_len // self.hop_length + 2 * self.voc_pad
         max_offsets = [b['mel'].shape[-1] -2 - (mel_win + 2 * self.voc_pad) for b in batch]
         mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
@@ -138,7 +138,7 @@ def get_tts_datasets(path: Path,
                      filter_attention=True,
                      filter_min_alignment=0.5,
                      filter_min_sharpness=0.9,
-                     model_type='tacotron'):
+                     model_type='tacotron') -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
 
@@ -165,6 +165,7 @@ def get_tts_datasets(path: Path,
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
+
     if model_type == 'tacotron':
         train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
                                     text_dict=text_dict, tokenizer=tokenizer)
@@ -199,11 +200,9 @@ def get_tts_datasets(path: Path,
 
 
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
-    dataset_filtered = []
-    for item_id, mel_len in dataset:
-        if mel_len <= max_mel_len:
-            dataset_filtered.append((item_id, mel_len))
-    return dataset_filtered
+    if max_mel_len is None:
+        return dataset
+    return [(id, len) for id, len in dataset if len <= max_mel_len]
 
 
 def filter_bad_attentions(dataset: List[tuple],

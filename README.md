@@ -18,10 +18,10 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE (28.10.2020)
-- Added pitch conditioning similar to the one in [FastPitch](https://arxiv.org/abs/2006.06873), model converges now in about 50k steps (a couple hrs training).
-- Pitch can be manipulated in inference, e.g. with --amp 2.0 for larger pitch swings.
-- Try pitch manipulation with the newest model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb).
+## UPDATE (10.05.2020)
+- Major refactoring
+- Replaced hparams.py with config.yaml that is now stored in the model
+- When loading a model, the hyperparams are restored automatically
 
 ## 🔈 Samples
 
@@ -109,13 +109,20 @@ Here is what the ForwardTacotron tensorboard looks like:
 </p>
 
 
-## Use the pretrained Models
+## Pretrained Models
 
-You can synthesize text using the pretrained models with
+| Model | Dataset | Commit |
+|---|---|---|
+|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
+|[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
+
+
+After downloading the models you can synthesize text using the pretrained models with
 ```
-python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_hparams.py --tts_weights pretrained/forward_400K.pyt wavernn --voc_weights pretrained/wave_575K.pyt
+python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt wavernn --voc_checkpoint wave_step_575k.pt
 
 ```
+
 
 ## Tips for training a WaveRNN model
 

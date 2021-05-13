@@ -444,7 +444,7 @@ class WaveRNN(nn.Module):
         return WaveRNN(**model_config)
 
     @classmethod
-    def from_checkpoint(cls, path: Path) -> 'WaveRNN':
+    def from_checkpoint(cls, path: Union[Path, str]) -> 'WaveRNN':
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         model = WaveRNN.from_config(checkpoint['config'])
         model.load_state_dict(checkpoint['model'])

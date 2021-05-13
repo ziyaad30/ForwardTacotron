@@ -9,6 +9,7 @@ from torch.utils.data.dataloader import DataLoader
 
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
+from trainer.common import to_device
 from trainer.forward_trainer import ForwardTrainer
 from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
@@ -26,15 +27,14 @@ def create_gta_features(model: Tacotron,
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(train_set) + len(val_set)
     dataset = itertools.chain(train_set, val_set)
-    for i, (x, mels, ids, x_lens, mel_lens, dur, pitch) in enumerate(dataset, 1):
-        x, m, dur, x_lens, mel_lens, pitch = x.to(device), mels.to(device), dur.to(device), \
-                                             x_lens.to(device), mel_lens.to(device), pitch.to(device)
+    for i, batch in enumerate(dataset, 1):
+        batch = to_device(batch, device=device)
 
         with torch.no_grad():
-            _, gta, _, _ = model(x, mels, dur, mel_lens, pitch)
-        gta = gta.cpu().numpy()
-        for j, item_id in enumerate(ids):
-            mel = gta[j][:, :mel_lens[j]]
+            pred = model(batch)
+        gta = pred['mel_post'].cpu().numpy()
+        for j, item_id in enumerate(batch['item_id']):
+            mel = gta[j][:, :batch['mel_len'][j]]
             np.save(str(save_path/f'{item_id}.npy'), mel, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         print('Creating Ground Truth Aligned Dataset...\n')
         train_set, val_set = get_tts_datasets(
             paths.data, 8, r=1, model_type='forward',
-            filter_attention=False, max_mel_len=99_000)
+            filter_attention=False, max_mel_len=None)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     else:
