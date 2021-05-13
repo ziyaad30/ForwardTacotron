@@ -3,7 +3,7 @@ from typing import Tuple, Dict, Any
 
 import torch
 from torch.optim.optimizer import Optimizer
-from torch.utils.data.dataset import Dataset
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
@@ -82,7 +82,8 @@ class ForwardTrainer:
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
-                       + self.train_cfg['pitch_loss_factor'] * pitch_loss
+                       + self.train_cfg['pitch_loss_factor'] * pitch_loss \
+                       + self.train_cfg['energy_loss_factor'] * energy_loss
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -132,7 +133,7 @@ class ForwardTrainer:
             pitch_loss_avg.reset()
             print(' ')
 
-    def evaluate(self, model: ForwardTacotron, val_set: Dataset) -> Tuple[float, float, float, float]:
+    def evaluate(self, model: ForwardTacotron, val_set: DataLoader) -> Dict[str, float]:
         model.eval()
         m_val_loss = 0
         dur_val_loss = 0
@@ -152,11 +153,12 @@ class ForwardTrainer:
                 energy_val_loss += energy_loss
                 m_val_loss += m1_loss.item() + m2_loss.item()
                 dur_val_loss += dur_loss.item()
-        m_val_loss /= len(val_set)
-        dur_val_loss /= len(val_set)
-        pitch_val_loss /= len(val_set)
-        energy_val_loss /= len(val_set)
-        return m_val_loss, dur_val_loss, pitch_val_loss, energy_val_loss
+        return {
+            'mel_Loss': m_val_loss / len(val_set),
+            'dur_loss': dur_val_loss / len(val_set),
+            'pitch_loss': pitch_val_loss / len(val_set),
+            'energy_loss': energy_val_loss / len(val_set)
+        }
 
     @ignore_exception
     def generate_plots(self, model: ForwardTacotron, session: TTSSession) -> None:
@@ -196,12 +198,13 @@ class ForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        m1_hat, m2_hat, dur_hat, pitch_hat, energy_hat = model.generate(batch['x'][0:1, :batch['x_len'][0]])
-        m1_hat_fig = plot_mel(m1_hat)
-        m2_hat_fig = plot_mel(m2_hat)
+        gen = model.generate(batch['x'][0:1, :batch['x_len'][0]])
 
-        pitch_gen_fig = plot_pitch(np_now(pitch_hat.squeeze()))
-        energy_gen_fig = plot_pitch(np_now(energy_hat.squeeze()))
+        m1_hat_fig = plot_mel(gen['mel'])
+        m2_hat_fig = plot_mel(gen['mel_post'])
+
+        pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
+        energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)
         self.writer.add_figure('Energy/generated', energy_gen_fig, model.step)

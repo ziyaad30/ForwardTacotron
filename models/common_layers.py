@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -42,7 +44,7 @@ class CBHG(nn.Module):
                  K: int,
                  in_channels: int,
                  channels: int,
-                 proj_channels: int,
+                 proj_channels: list,
                  num_highways: int) -> None:
         super().__init__()
 

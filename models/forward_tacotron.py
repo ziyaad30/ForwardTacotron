@@ -1,15 +1,14 @@
 from pathlib import Path
-from typing import Union, Callable, List, Dict, Any, Tuple
+from typing import Union, Callable, Dict, Any
 
 import numpy as np
-
-import torch.nn as nn
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from numba.core.config import reload_config
+from torch.nn import Embedding
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.common_layers import CBHG
-from utils.files import read_config
 from utils.text.symbols import phonemes
 
 
@@ -45,10 +44,11 @@ class LengthRegulator(nn.Module):
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, in_dims, conv_dims=256, rnn_dims=64, dropout=0.5) -> None:
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
         super().__init__()
+        self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(in_dims, conv_dims, 5, activation=torch.relu),
+            BatchNormConv(emb_dim, conv_dims, 5, activation=torch.relu),
             BatchNormConv(conv_dims, conv_dims, 5, activation=torch.relu),
             BatchNormConv(conv_dims, conv_dims, 5, activation=torch.relu),
         ])
@@ -56,13 +56,22 @@ class SeriesPredictor(nn.Module):
         self.lin = nn.Linear(2 * rnn_dims, 1)
         self.dropout = dropout
 
-    def forward(self, x: torch.tensor, alpha=1.0) -> torch.tensor:
+    def forward(self,
+                x: torch.tensor,
+                x_lens: torch.tensor = None,
+                alpha=1.0) -> torch.tensor:
+        x = self.embedding(x)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
+        if x_lens is not None:
+            x = pack_padded_sequence(x, lengths=x_lens, batch_first=True,
+                                     enforce_sorted=False)
         x, _ = self.rnn(x)
+        if x_lens is not None:
+            x, _ = pad_packed_sequence(x, padding_value=0.0, batch_first=True)
         x = self.lin(x)
         return x / alpha
 
@@ -108,6 +117,7 @@ class ForwardTacotron(nn.Module):
 
     def __init__(self,
                  embed_dims: int,
+                 series_embed_dims: int,
                  num_chars: int,
                  durpred_conv_dims: int,
                  durpred_rnn_dims: int,
@@ -134,15 +144,18 @@ class ForwardTacotron(nn.Module):
         self.rnn_dims = rnn_dims
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
-        self.dur_pred = SeriesPredictor(embed_dims,
+        self.dur_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
                                         dropout=durpred_dropout)
-        self.pitch_pred = SeriesPredictor(embed_dims,
+        self.pitch_pred = SeriesPredictor(num_chars=num_chars,
+                                          emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
                                           rnn_dims=pitch_rnn_dims,
                                           dropout=pitch_dropout)
-        self.energy_pred = SeriesPredictor(embed_dims,
+        self.energy_pred = SeriesPredictor(num_chars=num_chars,
+                                           emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
                                            rnn_dims=energy_rnn_dims,
                                            dropout=energy_dropout)
@@ -180,17 +193,18 @@ class ForwardTacotron(nn.Module):
         mel = batch['mel']
         dur = batch['dur']
         mel_lens = batch['mel_len']
+        x_lens = batch['x_len'].cpu()
         pitch = batch['pitch'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
 
         if self.training:
             self.step += 1
 
-        x = self.embedding(x)
-        dur_hat = self.dur_pred(x).squeeze()
-        pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        energy_hat = self.energy_pred(x).transpose(1, 2)
+        dur_hat = self.dur_pred(x, x_lens=x_lens).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, x_lens=x_lens).transpose(1, 2)
+        energy_hat = self.energy_pred(x, x_lens=x_lens).transpose(1, 2)
 
+        x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
@@ -205,10 +219,13 @@ class ForwardTacotron(nn.Module):
             x = torch.cat([x, energy_proj], dim=-1)
 
         x = self.lr(x, dur)
-        for i in range(x.size(0)):
-            x[i, mel_lens[i]:, :] = 0
+
+        x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
+                                 batch_first=True)
 
         x, _ = self.lstm(x)
+
+        x, _ = pad_packed_sequence(x, padding_value=11.5129, batch_first=True)
 
         x = F.dropout(x,
                       p=self.dropout,
@@ -232,10 +249,9 @@ class ForwardTacotron(nn.Module):
                  pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
                  energy_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
 
-                 ) -> tuple:
+                 ) -> Dict[str, torch.tensor]:
         self.eval()
 
-        x = self.embedding(x)
         dur = self.dur_pred(x, alpha=alpha)
         dur = dur.squeeze(2)
 
@@ -245,6 +261,7 @@ class ForwardTacotron(nn.Module):
         energy_hat = self.energy_pred(x).transpose(1, 2)
         energy_hat = energy_function(energy_hat)
 
+        x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
@@ -274,7 +291,8 @@ class ForwardTacotron(nn.Module):
         x_post = x_post.cpu().data.numpy()
         dur = dur.cpu().data.numpy()
 
-        return x, x_post, dur, pitch_hat, energy_hat
+        return {'mel': x, 'mel_post': x_post, 'dur': dur,
+                'pitch': pitch_hat, 'energy': energy_hat}
 
     def pad(self, x: torch.tensor, max_len: int) -> torch.tensor:
         x = x[:, :, :max_len]

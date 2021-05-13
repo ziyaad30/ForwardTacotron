@@ -46,7 +46,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
         dur = np.load(paths.alg / f'{item_id}.npy')
         mel = np.load(paths.mel / f'{item_id}.npy')
-        energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
+        energy = np.linalg.norm(np.exp(mel), axis=0, ord=1)
         assert np.sum(dur) == mel_len
         pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
         durs_cum = np.cumsum(np.pad(dur, (1, 0)))
@@ -64,17 +64,14 @@ def extract_pitch_energy(save_path_pitch: Path,
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
 
+    for item_id, phoneme_energy in phoneme_energies:
+        np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
+
     mean, var = normalize_values(phoneme_pitches)
     for item_id, phoneme_pitch in phoneme_pitches:
         np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
     print(f'\nPitch mean: {mean} var: {var}')
-
-    mean, var = normalize_values(phoneme_energies)
-    for item_id, phoneme_energy in phoneme_energies:
-        np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
-
-    print(f'\nEnergy mean: {mean} var: {var}')
 
     return mean, var
 

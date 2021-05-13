@@ -107,11 +107,12 @@ if __name__ == '__main__':
 
         wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}_n'
 
-        _, m, dur, pitch, energy = tts_model.generate(x=x, alpha=args.alpha,
-                                                      pitch_function=pitch_function,
-                                                      energy_function=energy_function)
-        for c, e in zip(text, energy.squeeze().tolist()):
-            print(f'{c} {e}')
+        gen = tts_model.generate(x=x,
+                                 alpha=args.alpha,
+                                 pitch_function=pitch_function,
+                                 energy_function=energy_function)
+
+        m = gen['mel_post']
         if args.vocoder == 'melgan':
             m = torch.tensor(m).unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
