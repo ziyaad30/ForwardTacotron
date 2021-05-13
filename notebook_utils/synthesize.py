@@ -32,22 +32,27 @@ class Synthesizer:
                  text: str,
                  voc_model: str,
                  alpha=1.0,
-                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x) -> np.array:
+                 pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
+                 energy_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
+                 ) -> np.array:
         x = self.cleaner(text)
         x = self.tokenizer(x)
         x = torch.tensor(x).unsqueeze(0)
-        _, m, _, _ = self.tts_model.generate(x, alpha=alpha, pitch_function=pitch_function)
+        gen = self.tts_model.generate(x,
+                                      alpha=alpha,
+                                      pitch_function=pitch_function,
+                                      energy_function=energy_function)
         if voc_model == 'griffinlim':
-            wav = self.dsp.griffinlim(m, n_iter=32)
+            wav = self.dsp.griffinlim(gen['mel_post'], n_iter=32)
         elif voc_model == 'wavernn':
-            m = torch.tensor(m).unsqueeze(0)
+            m = torch.tensor(gen['mel_post']).unsqueeze(0)
             wav = self.wavernn.generate(mels=m,
                                         batched=True,
                                         target=11_000,
                                         overlap=550,
                                         mu_law=self.dsp.mu_law)
         else:
-            m = torch.tensor(m).unsqueeze(0).cuda()
+            m = torch.tensor(gen['mel_post']).unsqueeze(0).cuda()
             with torch.no_grad():
                 wav = self.melgan.inference(m).cpu().numpy()
         return wav

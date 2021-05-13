@@ -64,8 +64,11 @@ def extract_pitch_energy(save_path_pitch: Path,
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
 
+    mean, var = normalize_values(phoneme_energies)
     for item_id, phoneme_energy in phoneme_energies:
         np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
+
+    print(f'\nEnergy mean: {mean} var: {var}')
 
     mean, var = normalize_values(phoneme_pitches)
     for item_id, phoneme_pitch in phoneme_pitches:
@@ -152,7 +155,7 @@ if __name__ == '__main__':
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
     if args.extract_pitch:
-        print('Extracting Pitch Values...')
+        print('Extracting Pitch and Energy Values...')
         mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                                          save_path_energy=paths.phon_energy,
                                          pitch_max_freq=dsp.pitch_max_freq)
