@@ -249,7 +249,7 @@ class ForwardTacotron(nn.Module):
                  pitch_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
                  energy_function: Callable[[torch.tensor], torch.tensor] = lambda x: x,
 
-                 ) -> Dict[str, torch.tensor]:
+                 ) -> Dict[str, np.array]:
         self.eval()
 
         dur = self.dur_pred(x, alpha=alpha)
