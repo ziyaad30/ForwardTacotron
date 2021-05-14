@@ -105,7 +105,7 @@ if __name__ == '__main__':
         x = tokenizer(x)
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
-        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}_n'
+        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
 
         gen = tts_model.generate(x=x,
                                  alpha=args.alpha,

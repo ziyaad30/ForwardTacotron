@@ -23,6 +23,11 @@ does not use any attention. Hence, the required memory grows linearly with text 
 - Added optional energy conditioning similar to the one in FastSpeech2
 - Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
 
+Energy conditioning reduces mel validation loss:
+<p align="center">
+  <img src="assets/energy_tb.png" width="700" />
+</p>
+
 ## 🔈 Samples
 
 [Can be found here.](https://as-ideas.github.io/ForwardTacotron/)
