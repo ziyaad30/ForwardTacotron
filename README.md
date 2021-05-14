@@ -20,8 +20,8 @@ does not use any attention. Hence, the required memory grows linearly with text 
 
 ## UPDATE (10.05.2020)
 - Major refactoring
-- Replaced hparams.py with config.yaml that is now stored in the model
-- When loading a model, the hyperparams are restored automatically
+- Added optional energy conditioning similar to the one in FastSpeech2
+- Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
 
 ## 🔈 Samples
 
@@ -115,6 +115,10 @@ Here is what the ForwardTacotron tensorboard looks like:
 |---|---|---|
 |[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
 |[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
+
+Our pre-trained LJSpeech model is compatible with the pre-trained vocoders:
+- [MelGAN](https://github.com/seungwonpark/melgan)
+- [HiFiGAN](https://github.com/jik876/hifi-gan)
 
 
 After downloading the models you can synthesize text using the pretrained models with
