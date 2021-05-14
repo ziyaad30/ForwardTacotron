@@ -156,12 +156,15 @@ Here is what the WaveRNN tensorboard looks like:
 
 * [FastSpeech: Fast, Robust and Controllable Text to Speech](https://arxiv.org/abs/1905.09263)
 * [FastPitch: Parallel Text-to-speech with Pitch Prediction](https://arxiv.org/abs/2006.06873)
+* [HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis](https://arxiv.org/abs/2010.05646)
+* [MelGAN: Generative Adversarial Networks for Conditional Waveform Synthesis](https://arxiv.org/abs/1910.06711)
 
 ## Acknowlegements
 
 * [https://github.com/keithito/tacotron](https://github.com/keithito/tacotron)
 * [https://github.com/fatchord/WaveRNN](https://github.com/fatchord/WaveRNN)
 * [https://github.com/seungwonpark/melgan](https://github.com/seungwonpark/melgan)
+* [https://github.com/jik876/hifi-gan](https://github.com/jik876/hifi-gan)
 * [https://github.com/xcmyz/LightSpeech](https://github.com/xcmyz/LightSpeech)
 * [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 * [https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch](https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch)
