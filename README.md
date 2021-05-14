@@ -18,10 +18,10 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE (10.05.2020)
-- Major refactoring
+## MAJOR UPDATE V1 --> V2 (10.05.2020)
 - Added optional energy conditioning similar to the one in FastSpeech2
 - Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
+- Major refactoring
 
 Energy conditioning reduces mel validation loss:
 <p align="center">
@@ -32,7 +32,8 @@ Energy conditioning reduces mel validation loss:
 
 [Can be found here.](https://as-ideas.github.io/ForwardTacotron/)
 
-The samples are generated with a model trained on LJSpeech. You can try out the latest pretrained model with the following notebook:  
+The samples are generated with a model trained on LJSpeech and vocoded with WaveRNN, [MelGAN](https://github.com/seungwonpark/melgan), or [HiFiGAN](https://github.com/jik876/hifi-gan). 
+You can try out the latest pretrained model with the following notebook:  
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)
 
@@ -74,7 +75,7 @@ python train_forward.py
 ```
 python gen_forward.py --alpha 1 --input_text 'this is whatever you want it to be' griffinlim
 ```
-If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, you can produce .mel files with:
+If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) or [HiFiGAN](https://github.com/jik876/hifi-gan) vocoder, you can produce .mel files with:
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' melgan
 ```
