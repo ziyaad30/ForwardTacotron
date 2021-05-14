@@ -53,14 +53,14 @@ class TestForwardDataset(unittest.TestCase):
 
         data = [dataset[i] for i in range(len(dataset))]
 
-        np.testing.assert_allclose(data[0]['mel'], mels[0])
-        np.testing.assert_allclose(data[1]['mel'], mels[1])
-        np.testing.assert_allclose(data[0]['dur'], durs[0])
-        np.testing.assert_allclose(data[1]['dur'], durs[1])
-        np.testing.assert_allclose(data[0]['pitch'], pitches[0])
-        np.testing.assert_allclose(data[1]['pitch'], pitches[1])
-        np.testing.assert_allclose(data[0]['energy'], energies[0])
-        np.testing.assert_allclose(data[1]['energy'], energies[1])
+        np.testing.assert_allclose(data[0]['mel'], mels[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['mel'], mels[1], rtol=1e-10)
+        np.testing.assert_allclose(data[0]['dur'], durs[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['dur'], durs[1], rtol=1e-10)
+        np.testing.assert_allclose(data[0]['pitch'], pitches[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['pitch'], pitches[1], rtol=1e-10)
+        np.testing.assert_allclose(data[0]['energy'], energies[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['energy'], energies[1], rtol=1e-10)
 
         self.assertEqual(1, data[0]['x_len'])
         self.assertEqual(2, data[1]['x_len'])
