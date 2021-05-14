@@ -255,6 +255,10 @@ class ForwardTacotron(nn.Module):
         dur = self.dur_pred(x, alpha=alpha)
         dur = dur.squeeze(2)
 
+        # Fixing breaking synth of silent texts
+        if torch.sum(dur) <= 0:
+            dur = torch.full(x.size(), fill_value=2, device=x.device)
+
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         pitch_hat = pitch_function(pitch_hat)
 
