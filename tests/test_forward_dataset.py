@@ -26,13 +26,16 @@ class TestForwardDataset(unittest.TestCase):
         mel_dir = data_dir / 'mel'
         alg_dir = data_dir / 'alg'
         pitch_dir = data_dir / 'phon_pitch'
+        energy_dir = data_dir / 'phon_energy'
         mel_dir.mkdir(parents=True)
         alg_dir.mkdir(parents=True)
         pitch_dir.mkdir(parents=True)
+        energy_dir.mkdir(parents=True)
 
         mels = [np.full((2, 2), fill_value=1), np.full((2, 3), fill_value=2)]
         durs = [np.full(1, fill_value=2), np.full(2, fill_value=3)]
         pitches = [np.full(1, fill_value=5), np.full(2, fill_value=6)]
+        energies = [np.full(1, fill_value=6), np.full(2, fill_value=7)]
 
         np.save(mel_dir / '0.npy', mels[0])
         np.save(mel_dir / '1.npy', mels[1])
@@ -40,6 +43,8 @@ class TestForwardDataset(unittest.TestCase):
         np.save(alg_dir / '1.npy', durs[1])
         np.save(pitch_dir / '0.npy', pitches[0])
         np.save(pitch_dir / '1.npy', pitches[1])
+        np.save(energy_dir / '0.npy', energies[0])
+        np.save(energy_dir / '1.npy', energies[1])
 
         dataset = ForwardDataset(path=data_dir,
                                  dataset_ids=['0', '1'],
@@ -54,6 +59,8 @@ class TestForwardDataset(unittest.TestCase):
         np.testing.assert_allclose(data[1]['dur'], durs[1])
         np.testing.assert_allclose(data[0]['pitch'], pitches[0])
         np.testing.assert_allclose(data[1]['pitch'], pitches[1])
+        np.testing.assert_allclose(data[0]['energy'], energies[0])
+        np.testing.assert_allclose(data[1]['energy'], energies[1])
 
         self.assertEqual(1, data[0]['x_len'])
         self.assertEqual(2, data[1]['x_len'])

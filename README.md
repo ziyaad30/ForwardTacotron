@@ -21,7 +21,7 @@ does not use any attention. Hence, the required memory grows linearly with text 
 ## MAJOR UPDATE V1 --> V2 (10.05.2020)
 - Added optional energy conditioning similar to the one in FastSpeech2
 - Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
-- Major refactoring
+- Major refactoring, added tests etc.
 
 Energy conditioning reduces mel validation loss:
 <p align="center">
