@@ -1,7 +1,7 @@
 Inspired by Microsoft's [FastSpeech](https://www.microsoft.com/en-us/research/blog/fastspeech-new-text-to-speech-model-improves-on-speed-accuracy-and-controllability/)
 we modified Tacotron to generate speech in a single forward pass using a duration predictor to align text and generated mel spectrograms.
 
-## NEW: Forward Tacotron V2 (Energy + Pitch) + HiFiGAN Vocoder
+## NEW (14.05.2021): Forward Tacotron V2 (Energy + Pitch) + HiFiGAN Vocoder
 
 The samples are generated with a model trained 80K steps on [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) together with the pretrained HiFiGAN vocoder provided by the [HiFiGAN repo](https://github.com/jik876/hifi-gan).
 
