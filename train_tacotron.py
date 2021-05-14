@@ -11,7 +11,7 @@ from models.tacotron import Tacotron
 from trainer.common import to_device, np_now
 from trainer.taco_trainer import TacoTrainer
 from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_tts_datasets, filter_max_len
+from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import DSP
 from utils.duration_extraction import extract_durations_per_count, extract_durations_with_dijkstra
