@@ -11,6 +11,8 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from models.common_layers import CBHG
 from utils.text.symbols import phonemes
 
+MEL_PAD_VALUE = -11.5129
+
 
 class LengthRegulator(nn.Module):
 
@@ -225,7 +227,7 @@ class ForwardTacotron(nn.Module):
 
         x, _ = self.lstm(x)
 
-        x, _ = pad_packed_sequence(x, padding_value=11.5129, batch_first=True)
+        x, _ = pad_packed_sequence(x, padding_value=MEL_PAD_VALUE, batch_first=True)
 
         x = F.dropout(x,
                       p=self.dropout,
@@ -300,7 +302,7 @@ class ForwardTacotron(nn.Module):
 
     def pad(self, x: torch.tensor, max_len: int) -> torch.tensor:
         x = x[:, :, :max_len]
-        x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', -11.5129)
+        x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', MEL_PAD_VALUE)
         return x
 
     def get_step(self) -> int:
