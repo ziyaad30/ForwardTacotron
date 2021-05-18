@@ -297,7 +297,7 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     mel_lens = [b['mel_len'] for b in batch]
     mel_lens = torch.tensor(mel_lens)
 
-    dur, pitch = None, None
+    dur, pitch, energy = None, None, None
     if 'dur' in batch[0]:
         dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = np.stack(dur)
