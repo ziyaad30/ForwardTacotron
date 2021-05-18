@@ -103,8 +103,7 @@ def create_gta_features(model: Tacotron,
 def create_align_features(model: Tacotron,
                           train_set: DataLoader,
                           val_set: DataLoader,
-                          save_path_alg: Path,
-                          save_path_pitch: Path,
+                          paths: Paths,
                           pitch_max_freq: float) -> None:
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
@@ -133,13 +132,15 @@ def create_align_features(model: Tacotron,
         durs = dur_extraction_func(seq, att, mel_len)
         if np.sum(durs) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
-        np.save(str(save_path_alg / f'{item_id}.npy'), durs, allow_pickle=False)
+        np.save(str(paths.alg / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Files '
         stream(msg)
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('Extracting Pitch Values...')
-    extract_pitch_energy(save_path_pitch, pitch_max_freq)
+    extract_pitch_energy(save_path_pitch=paths.phon_pitch,
+                         save_path_energy=paths.phon_energy,
+                         pitch_max_freq=pitch_max_freq)
 
 
 if __name__ == '__main__':
@@ -188,8 +189,7 @@ if __name__ == '__main__':
                                               max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
-                              save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,
-                              pitch_max_freq=dsp.pitch_max_freq)
+                              paths=paths, pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
@@ -199,8 +199,7 @@ if __name__ == '__main__':
                                               max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
-                              save_path_alg=paths.alg, save_path_pitch=paths.phon_pitch,
-                              pitch_max_freq=dsp.pitch_max_freq)
+                              paths=paths, pitch_max_freq=dsp.pitch_max_freq)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 
 
