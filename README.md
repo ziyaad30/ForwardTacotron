@@ -79,7 +79,7 @@ If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) or [HiFi
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' melgan
 ```
-To vocode the resulting .mel files use the inference.py script from the MelGAN repo and point to the model output folder (see inference example at [MelGAN](https://github.com/seungwonpark/melgan))
+To vocode the resulting .mel files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
 
 As in the original repo you can also use a trained WaveRNN vocoder:
 ```
