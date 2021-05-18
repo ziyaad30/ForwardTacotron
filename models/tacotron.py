@@ -1,25 +1,12 @@
-import os
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pathlib import Path
-from typing import Union
+from typing import Union, Dict, Any, Tuple
 
-
-class HighwayNetwork(nn.Module):
-    def __init__(self, size):
-        super().__init__()
-        self.W1 = nn.Linear(size, size)
-        self.W2 = nn.Linear(size, size)
-        self.W1.bias.data.fill_(0.)
-
-    def forward(self, x):
-        x1 = self.W1(x)
-        x2 = self.W2(x)
-        g = torch.sigmoid(x2)
-        y = g * F.relu(x1) + (1. - g) * x
-        return y
+from models.common_layers import CBHG
+from utils.text.symbols import phonemes
 
 
 class Encoder(nn.Module):
@@ -38,99 +25,6 @@ class Encoder(nn.Module):
         x = self.cbhg(x)
         return x
 
-
-class BatchNormConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, relu=True):
-        super().__init__()
-        self.conv = nn.Conv1d(in_channels, out_channels, kernel, stride=1, padding=kernel // 2, bias=False)
-        self.bnorm = nn.BatchNorm1d(out_channels)
-        self.relu = relu
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = F.relu(x) if self.relu is True else x
-        return self.bnorm(x)
-
-
-class CBHG(nn.Module):
-    def __init__(self, K, in_channels, channels, proj_channels, num_highways):
-        super().__init__()
-
-        # List of all rnns to call `flatten_parameters()` on
-        self._to_flatten = []
-
-        self.bank_kernels = [i for i in range(1, K + 1)]
-        self.conv1d_bank = nn.ModuleList()
-        for k in self.bank_kernels:
-            conv = BatchNormConv(in_channels, channels, k)
-            self.conv1d_bank.append(conv)
-
-        self.maxpool = nn.MaxPool1d(kernel_size=2, stride=1, padding=1)
-
-        self.conv_project1 = BatchNormConv(len(self.bank_kernels) * channels, proj_channels[0], 3)
-        self.conv_project2 = BatchNormConv(proj_channels[0], proj_channels[1], 3, relu=False)
-
-        # Fix the highway input if necessary
-        if proj_channels[-1] != channels:
-            self.highway_mismatch = True
-            self.pre_highway = nn.Linear(proj_channels[-1], channels, bias=False)
-        else:
-            self.highway_mismatch = False
-
-        self.highways = nn.ModuleList()
-        for i in range(num_highways):
-            hn = HighwayNetwork(channels)
-            self.highways.append(hn)
-
-        self.rnn = nn.GRU(channels, channels, batch_first=True, bidirectional=True)
-        self._to_flatten.append(self.rnn)
-
-        # Avoid fragmentation of RNN parameters and associated warning
-        self._flatten_parameters()
-
-    def forward(self, x):
-        # Although we `_flatten_parameters()` on init, when using DataParallel
-        # the model gets replicated, making it no longer guaranteed that the
-        # weights are contiguous in GPU memory. Hence, we must call it again
-        self._flatten_parameters()
-
-        # Save these for later
-        residual = x
-        seq_len = x.size(-1)
-        conv_bank = []
-
-        # Convolution Bank
-        for conv in self.conv1d_bank:
-            c = conv(x) # Convolution
-            conv_bank.append(c[:, :, :seq_len])
-
-        # Stack along the channel axis
-        conv_bank = torch.cat(conv_bank, dim=1)
-
-        # dump the last padding to fit residual
-        x = self.maxpool(conv_bank)[:, :, :seq_len]
-
-        # Conv1d projections
-        x = self.conv_project1(x)
-        x = self.conv_project2(x)
-
-        # Residual Connect
-        x = x + residual
-
-        # Through the highways
-        x = x.transpose(1, 2)
-        if self.highway_mismatch is True:
-            x = self.pre_highway(x)
-        for h in self.highways: x = h(x)
-
-        # And then the RNN
-        x, _ = self.rnn(x)
-        return x
-
-    def _flatten_parameters(self):
-        """Calls `flatten_parameters` on all the rnns used by the WaveRNN. Used
-        to improve efficiency and avoid PyTorch yelling at us."""
-        [m.flatten_parameters() for m in self._to_flatten]
 
 class PreNet(nn.Module):
     def __init__(self, in_dims, fc1_dims=256, fc2_dims=128, dropout=0.5):
@@ -209,6 +103,7 @@ class Decoder(nn.Module):
     # Class variable because its value doesn't change between classes
     # yet ought to be scoped by class because its a property of a Decoder
     max_r = 20
+
     def __init__(self, n_mels, decoder_dims, lstm_dims):
         super().__init__()
         self.register_buffer('r', torch.tensor(1, dtype=torch.int))
@@ -220,7 +115,7 @@ class Decoder(nn.Module):
         self.res_rnn1 = nn.LSTMCell(lstm_dims, lstm_dims)
         self.res_rnn2 = nn.LSTMCell(lstm_dims, lstm_dims)
         self.mel_proj = nn.Linear(lstm_dims, n_mels * self.max_r, bias=False)
-
+    
     def zoneout(self, prev, current, p=0.1):
         device = next(self.parameters()).device  # Use same device as parameters
         mask = torch.zeros(prev.size(), device=device).bernoulli_(p)
@@ -280,34 +175,45 @@ class Decoder(nn.Module):
 
 
 class Tacotron(nn.Module):
-    def __init__(self, embed_dims, num_chars, encoder_dims, decoder_dims, n_mels, fft_bins, postnet_dims,
-                 encoder_K, lstm_dims, postnet_K, num_highways, dropout, stop_threshold):
+
+    def __init__(self,
+                 embed_dims: int,
+                 num_chars: int,
+                 encoder_dims: int,
+                 decoder_dims: int,
+                 n_mels: int,
+                 postnet_dims: int,
+                 encoder_k: int,
+                 lstm_dims: int,
+                 postnet_k: int,
+                 num_highways: int,
+                 dropout: float,
+                 stop_threshold: float) -> None:
         super().__init__()
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
-                               encoder_K, num_highways, dropout)
+                               encoder_k, num_highways, dropout)
         self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
-        self.postnet = CBHG(postnet_K, n_mels, postnet_dims, [256, 80], num_highways)
-        self.post_proj = nn.Linear(postnet_dims * 2, fft_bins, bias=False)
+        self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
+        self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
 
         self.init_model()
-        self.num_params()
 
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.register_buffer('stop_threshold', torch.tensor(stop_threshold, dtype=torch.float32))
 
     @property
-    def r(self):
+    def r(self) -> int:
         return self.decoder.r.item()
 
     @r.setter
-    def r(self, value):
+    def r(self, value: int) -> None:
         self.decoder.r = self.decoder.r.new_tensor(value, requires_grad=False)
 
-    def forward(self, x, m, generate_gta=False):
+    def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
         device = next(self.parameters()).device  # use same device as parameters
 
         if self.training:
@@ -363,12 +269,11 @@ class Tacotron(nn.Module):
 
         return mel_outputs, linear, attn_scores
 
-    def generate(self, x, steps=2000):
+    def generate(self, x: torch.tensor, steps=2000) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
         self.eval()
         device = next(self.parameters()).device  # use same device as parameters
 
         batch_size = 1
-        x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
         # Need to initialise all hidden states and pack into tuple for tidyness
         attn_hidden = torch.zeros(batch_size, self.decoder_dims, device=device)
@@ -436,30 +341,16 @@ class Tacotron(nn.Module):
         # assignment to parameters or buffers is overloaded, updates internal dict entry
         self.step = self.step.data.new_tensor(1)
 
-    def log(self, path, msg):
-        with open(path, 'a') as f:
-            print(msg, file=f)
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'Tacotron':
+        model_config = config['tacotron']['model']
+        model_config['num_chars'] = len(phonemes)
+        model_config['n_mels'] = config['dsp']['num_mels']
+        return Tacotron(**model_config)
 
-    def load(self, path: Union[str, Path]):
-        # Use device of model params as location for loaded state
-        device = next(self.parameters()).device
-        state_dict = torch.load(path, map_location=device)
-
-        # Backwards compatibility with old saved models
-        if 'r' in state_dict and not 'decoder.r' in state_dict:
-            self.r = state_dict['r']
-
-        self.load_state_dict(state_dict, strict=False)
-
-    def save(self, path: Union[str, Path]):
-        # No optimizer argument because saving a model should not include data
-        # only relevant in the training process - it should only be properties
-        # of the model itself. Let caller take care of saving optimzier state.
-        torch.save(self.state_dict(), path)
-
-    def num_params(self, print_out=True):
-        parameters = filter(lambda p: p.requires_grad, self.parameters())
-        parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
-        if print_out:
-            print('Trainable Parameters: %.3fM' % parameters)
-        return parameters
+    @classmethod
+    def from_checkpoint(cls, path: Union[Path, str]) -> 'Tacotron':
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model = Tacotron.from_config(checkpoint['config'])
+        model.load_state_dict(checkpoint['model'])
+        return model

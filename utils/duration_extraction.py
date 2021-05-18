@@ -1,17 +1,19 @@
+from typing import Tuple
+
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
 
-def to_node_index(i, j, cols):
+def to_node_index(i: int, j: int, cols: int) -> int:
     return cols * i + j
 
 
-def from_node_index(node_index, cols):
+def from_node_index(node_index: int, cols: int) -> Tuple[int, int]:
     return node_index // cols, node_index % cols
 
 
-def to_adj_matrix(mat):
+def to_adj_matrix(mat: np.array) -> csr_matrix:
     rows = mat.shape[0]
     cols = mat.shape[1]
 
@@ -49,7 +51,9 @@ def to_adj_matrix(mat):
     return adj_mat.tocsr()
 
 
-def extract_durations_with_dijkstra(seq: np.array, att: np.array, mel_len: int) -> np.array:
+def extract_durations_with_dijkstra(seq: np.array,
+                                    att: np.array,
+                                    mel_len: int) -> np.array:
     """
     Extracts durations from the attention matrix by finding the shortest monotonic path from
     top left to bottom right.
@@ -83,7 +87,9 @@ def extract_durations_with_dijkstra(seq: np.array, att: np.array, mel_len: int) 
     return durations
 
 
-def extract_durations_per_count(seq: np.array, att: np.array, mel_len: int) -> np.array:
+def extract_durations_per_count(seq: np.array,
+                                att: np.array,
+                                mel_len: int) -> np.array:
     argmax = np.argmax(att[:, :], axis=1)
     durations = np.zeros(seq.shape[0], dtype=np.int32)
     # fix random jumps in attention

@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from utils.distribution import sample_from_discretized_mix_logistic
 from utils.display import *
 from utils.dsp import *
-import os
 import numpy as np
 from pathlib import Path
 from typing import Union
@@ -167,7 +166,7 @@ class WaveRNN(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
-    def generate(self, mels, save_path: Union[str, Path, None], batched, target, overlap, mu_law, silent=False):
+    def generate(self, mels, batched, target, overlap, mu_law, silent=False) -> np.array:
         self.eval()
 
         device = next(self.parameters()).device  # use same device as parameters
@@ -247,7 +246,7 @@ class WaveRNN(nn.Module):
         output = output.astype(np.float64)
 
         if mu_law:
-            output = decode_mu_law(output, self.n_classes, False)
+            output = DSP.decode_mu_law(output, self.n_classes, False)
 
         if batched:
             output = self.xfade_and_unfold(output, target, overlap)
@@ -258,9 +257,6 @@ class WaveRNN(nn.Module):
         fade_out = np.linspace(1, 0, 20 * self.hop_length)
         output = output[:wave_len]
         output[-20 * self.hop_length:] *= fade_out
-
-        if save_path is not None:
-            save_wav(output, save_path)
 
         self.train()
 
@@ -436,3 +432,20 @@ class WaveRNN(nn.Module):
         """Calls `flatten_parameters` on all the rnns used by the WaveRNN. Used
         to improve efficiency and avoid PyTorch yelling at us."""
         [m.flatten_parameters() for m in self._to_flatten]
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'WaveRNN':
+        model_config = config['vocoder']['model']
+        model_config['bits'] = config['dsp']['bits']
+        model_config['feat_dims'] = config['dsp']['num_mels']
+        model_config['hop_length'] = config['dsp']['hop_length']
+        model_config['sample_rate'] = config['dsp']['sample_rate']
+        model_config['upsample_factors'] = model_config['upsample_factors']
+        return WaveRNN(**model_config)
+
+    @classmethod
+    def from_checkpoint(cls, path: Union[Path, str]) -> 'WaveRNN':
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model = WaveRNN.from_config(checkpoint['config'])
+        model.load_state_dict(checkpoint['model'])
+        return model
