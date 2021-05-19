@@ -55,6 +55,8 @@ pip install -r requirements.txt
 
 ## 🚀 Training your own Model
 
+Change the params in the config.yaml according to your needs and follow the steps below:
+
 (1) Download and preprocess the [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) dataset:
  ```
 python preprocess.py --path /path/to/ljspeech
@@ -63,15 +65,16 @@ python preprocess.py --path /path/to/ljspeech
 ```
 python train_tacotron.py
 ```
-(3) Use the trained tacotron model to create alignment features with:
+Once the training is finished, the model will automatically extract the alignment features from the dataset. In case you stopped the training early, you 
+can use the latest checkpoint to manually run the process with:
 ```
 python train_tacotron.py --force_align
 ```
-(4) Train ForwardTacotron with:
+(3) Train ForwardTacotron with:
 ```
 python train_forward.py
 ```
-(5) Generate Sentences with Griffin-Lim vocoder:
+(4) Generate Sentences with Griffin-Lim vocoder:
 ```
 python gen_forward.py --alpha 1 --input_text 'this is whatever you want it to be' griffinlim
 ```
