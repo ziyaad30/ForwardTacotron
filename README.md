@@ -23,6 +23,9 @@ does not use any attention. Hence, the required memory grows linearly with text 
 - Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
 - Major refactoring, added tests etc.
 
+Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
+
+
 Energy conditioning reduces mel validation loss:
 <p align="center">
   <img src="assets/energy_tb.png" width="700" />
