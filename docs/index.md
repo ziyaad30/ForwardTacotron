@@ -17,6 +17,10 @@ The samples are generated with a model trained 80K steps on [LJSpeech](https://k
 
 <audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_hifigan_80k.wav?raw=true" controls preload></audio>
 
+<p class="text">In a statement announcing his resignation, Mr Ross, said: "While the intentions may have been well meaning, the reaction to this news shows that Mr Cummings interpretation of the government advice was not shared by the vast majority of people who have done as the government asked."</p>
+
+<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/8_hifigan_80k.wav?raw=true" controls preload></audio>
+
 
 ## Forward Tacotron + MelGAN Vocoder
 
