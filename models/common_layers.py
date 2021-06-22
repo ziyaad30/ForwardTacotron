@@ -90,7 +90,6 @@ class CBHG(nn.Module):
         x = self.conv_project1(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv_project2(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # Residual Connect
         x = x + residual
