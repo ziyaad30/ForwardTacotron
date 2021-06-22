@@ -45,9 +45,11 @@ class CBHG(nn.Module):
                  in_channels: int,
                  channels: int,
                  proj_channels: list,
-                 num_highways: int) -> None:
+                 num_highways: int,
+                 dropout: float = 0.5) -> None:
         super().__init__()
 
+        self.dropout = dropout
         self.bank_kernels = [i for i in range(1, K + 1)]
         self.conv1d_bank = nn.ModuleList()
         for k in self.bank_kernels:
@@ -82,10 +84,13 @@ class CBHG(nn.Module):
 
         # dump the last padding to fit residual
         x = self.maxpool(conv_bank)[:, :, :seq_len]
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # Conv1d projections
         x = self.conv_project1(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv_project2(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # Residual Connect
         x = x + residual
