@@ -1,6 +1,6 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'ljspeech_tts'
+tts_model_id: 'asvoice2_jit_add_tts'
 
 data_path: 'data/' # output data path
 
@@ -36,9 +36,9 @@ preprocessing:
 
   seed: 42
   n_val: 200
-  language: 'en-us'
-  cleaner_name: 'english_cleaners'     # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: True                   # whether to phonemize the text
+  language: 'de'
+  cleaner_name: 'no_cleaners'     # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: False                   # whether to phonemize the text
   min_text_len: 2
 
   # Duration Extraction from Attention
@@ -108,8 +108,6 @@ forward_tacotron:
   model:
     embed_dims: 256             # embedding dimension for the graphemes/phoneme inputs
     series_embed_dims: 64       # grapheme embedding dimension for series predictor
-    prenet_dims: 256
-    postnet_dims: 256
     durpred_conv_dims: 256
     durpred_rnn_dims: 64
     durpred_dropout: 0.5
@@ -117,20 +115,24 @@ forward_tacotron:
     pitch_conv_dims: 256
     pitch_rnn_dims: 128
     pitch_dropout: 0.5
-    pitch_emb_dims: 32           # embedding dimension of pitch, set to 0 if you don't want pitch conditioning
-    pitch_proj_dropout: 0.
+    pitch_strength: 1.
 
     energy_conv_dims: 256
     energy_rnn_dims: 64
     energy_dropout: 0.5
-    energy_emb_dims: 32           # embedding dimension of energy, set to 0 if you don't want energy conditioning
-    energy_proj_dropout: 0.
+    energy_strength: 0.
 
+    prenet_dims: 256
     prenet_k: 16
-    postnet_k: 8
+    prenet_dropout: 0.5
+    prenet_num_highways: 4
+
     rnn_dims: 512
-    num_highways: 4
-    dropout: 0.1
+
+    postnet_dims: 256
+    postnet_k: 8
+    postnet_num_highways: 4
+    postnet_dropout: 0.
 
   training:
     schedule:
@@ -139,8 +141,8 @@ forward_tacotron:
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
-    pitch_zoneout: 0.3
-    energy_zoneout: 0.3
+    pitch_zoneout: 0.
+    energy_zoneout: 0.
 
     max_mel_len: 1250              # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0            # clips the gradient norm to prevent explosion - set to None if not needed
