@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dp.utils.io import read_config
 from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
@@ -310,8 +309,9 @@ class ForwardTacotron(nn.Module):
         model.load_state_dict(checkpoint['model'])
         return model
 
-
 if __name__ == '__main__':
+    from dp.utils.io import read_config
+
     config = read_config('../config.yaml')
     tts_model = ForwardTacotron.from_config(config)
     tts_model.eval()
