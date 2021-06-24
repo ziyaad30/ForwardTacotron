@@ -1,11 +1,12 @@
 from pathlib import Path
 from typing import Union, Callable, Dict, Any
 
+import math
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Embedding
+from torch.nn import Embedding, TransformerEncoderLayer, LayerNorm, TransformerEncoder
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
 from models.common_layers import CBHG
@@ -24,6 +25,74 @@ class LengthRegulator(nn.Module):
             x_expanded.append(x_exp)
         x_expanded = pad_sequence(x_expanded, padding_value=0., batch_first=True)
         return x_expanded
+
+
+class PositionalEncoding(torch.nn.Module):
+
+    def __init__(self, d_model: int, dropout=0.1, max_len=5000) -> None:
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+        self.scale = torch.nn.Parameter(torch.ones(1))
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:         # shape: [T, N]
+        x = x + self.scale * self.pe[:x.size(0), :]
+        return self.dropout(x)
+
+
+def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
+    mask = torch.triu(torch.ones(sz, sz), 1)
+    mask = mask.masked_fill(mask == 1, float('-inf'))
+    return mask
+
+
+def make_len_mask(inp: torch.Tensor) -> torch.Tensor:
+    return (inp == 0).transpose(0, 1)
+
+
+class ForwardTransformer(torch.nn.Module):
+
+    def __init__(self,
+                 encoder_vocab_size: int,
+                 d_model=256,
+                 d_fft=512,
+                 layers=6,
+                 dropout=0.1,
+                 heads=4) -> None:
+        super(ForwardTransformer, self).__init__()
+
+        self.d_model = d_model
+
+        self.embedding = nn.Embedding(encoder_vocab_size, d_model)
+        self.pos_encoder = PositionalEncoding(d_model, dropout)
+
+        encoder_layer = TransformerEncoderLayer(d_model=d_model,
+                                                nhead=heads,
+                                                dim_feedforward=d_fft,
+                                                dropout=dropout,
+                                                activation='relu')
+        encoder_norm = LayerNorm(d_model)
+        self.encoder = TransformerEncoder(encoder_layer=encoder_layer,
+                                          num_layers=layers,
+                                          norm=encoder_norm)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:         # shape: [N, T]
+
+        x = x.transpose(0, 1)        # shape: [T, N]
+        src_pad_mask = make_len_mask(x).to(x.device)
+        x = self.embedding(x)
+        x = self.pos_encoder(x)
+        x = self.encoder(x, src_key_padding_mask=src_pad_mask)
+        x = x.transpose(0, 1)
+        return x
 
 
 class SeriesPredictor(nn.Module):
@@ -88,20 +157,20 @@ class ForwardTacotron(nn.Module):
                  energy_dropout: float,
                  energy_strength: float,
                  rnn_dims: int,
+                 prenet_layers: int,
+                 prenet_heads: int,
+                 prenet_fft: int,
                  prenet_dims: int,
-                 prenet_k: int,
-                 postnet_num_highways: int,
                  prenet_dropout: float,
+                 postnet_num_highways: int,
                  postnet_dims: int,
                  postnet_k: int,
-                 prenet_num_highways: int,
                  postnet_dropout: float,
                  n_mels: int,
                  padding_value=-11.5129):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
-        self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
                                         emb_dim=series_embed_dims,
@@ -118,13 +187,10 @@ class ForwardTacotron(nn.Module):
                                            conv_dims=energy_conv_dims,
                                            rnn_dims=energy_rnn_dims,
                                            dropout=energy_dropout)
-        self.prenet = CBHG(K=prenet_k,
-                           in_channels=embed_dims,
-                           channels=prenet_dims,
-                           proj_channels=[prenet_dims, embed_dims],
-                           num_highways=prenet_num_highways,
-                           dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims,
+        self.prenet = ForwardTransformer(heads=prenet_heads, encoder_vocab_size=num_chars, dropout=prenet_dropout,
+                                         d_model=prenet_dims, d_fft=prenet_fft, layers=prenet_layers)
+
+        self.lstm = nn.LSTM(prenet_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -139,8 +205,8 @@ class ForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, prenet_dims, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, prenet_dims, kernel_size=3, padding=1)
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = batch['x']
@@ -157,8 +223,6 @@ class ForwardTacotron(nn.Module):
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
         x = self.prenet(x)
 
         pitch_proj = self.pitch_proj(pitch)
@@ -211,8 +275,6 @@ class ForwardTacotron(nn.Module):
         energy_hat = self.energy_pred(x).transpose(1, 2)
         energy_hat = energy_function(energy_hat)
 
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
         x = self.prenet(x)
 
         pitch_proj = self.pitch_proj(pitch_hat)
@@ -257,8 +319,6 @@ class ForwardTacotron(nn.Module):
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
         x = self.prenet(x)
 
         pitch_proj = self.pitch_proj(pitch_hat)

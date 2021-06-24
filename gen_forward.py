@@ -90,6 +90,7 @@ if __name__ == '__main__':
             texts = f.readlines()
 
     tts_k = tts_model.get_step() // 1000
+    tts_model.eval()
 
     simple_table([('Forward Tacotron', str(tts_k) + 'k'),
                   ('Vocoder Type', args.vocoder)])
@@ -106,13 +107,11 @@ if __name__ == '__main__':
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
         wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
+        with torch.no_grad():
+            gen = tts_model.generate_jit(x=x,
+                                     alpha=args.alpha)
 
-        gen = tts_model.generate(x=x,
-                                 alpha=args.alpha,
-                                 pitch_function=pitch_function,
-                                 energy_function=energy_function)
-
-        m = gen['mel_post']
+        m = gen['mel_post'].cpu().numpy()
         if args.vocoder == 'melgan':
             m = torch.tensor(m).unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
