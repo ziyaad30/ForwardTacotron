@@ -205,7 +205,6 @@ class BatchNormConv(nn.Module):
 class ForwardTacotron(nn.Module):
 
     def __init__(self,
-                 embed_dims: int,
                  series_embed_dims: int,
                  num_chars: int,
                  durpred_conv_dims: int,
