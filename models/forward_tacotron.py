@@ -83,9 +83,9 @@ class TransformerEncoderConvLayer(nn.Module):
         super(TransformerEncoderConvLayer, self).__init__()
         self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
-        self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
-        self.conv = nn.Conv1d(dim_feedforward, d_model, 3, stride=1, padding=1)
+        self.conv1 = nn.Conv1d(d_model, dim_feedforward, 3, stride=1, padding=1)
+        self.conv2 = nn.Conv1d(dim_feedforward, d_model, 3, stride=1, padding=1)
 
         self.norm1 = LayerNorm(d_model)
         self.norm2 = LayerNorm(d_model)
@@ -114,7 +114,9 @@ class TransformerEncoderConvLayer(nn.Module):
                               key_padding_mask=src_key_padding_mask)[0]
         src = src + self.dropout1(src2)
         src = self.norm1(src)
-        src2 = self.conv(self.dropout(self.activation(self.linear1(src))).transpose(1, 2)).transpose(1, 2)
+        src2 = self.conv1(src.transpose(1, 2))
+        src2 = self.dropout(self.activation(src2))
+        src2 = self.conv2(src2).transpose(1, 2)
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
