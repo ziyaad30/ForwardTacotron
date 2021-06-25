@@ -185,8 +185,8 @@ class ForwardTacotron(nn.Module):
         x_post = self.post_proj(x_post)
         x_post = x_post.transpose(1, 2)
 
-        x_post = self.pad(x_post, mel.size(2))
-        x = self.pad(x, mel.size(2))
+        x_post = self._pad(x_post, mel.size(2))
+        x = self._pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat}
@@ -195,68 +195,45 @@ class ForwardTacotron(nn.Module):
                  x: torch.Tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
-                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, np.array]:
+                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
-
-        dur = self.dur_pred(x, alpha=alpha)
-        dur = dur.squeeze(2)
-
-        # Fixing breaking synth of silent texts
-        if torch.sum(dur) <= 0:
-            dur = torch.full(x.size(), fill_value=2, device=x.device)
-
-        pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        pitch_hat = pitch_function(pitch_hat)
-
-        energy_hat = self.energy_pred(x).transpose(1, 2)
-        energy_hat = energy_function(energy_hat)
-
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
-        x = self.prenet(x)
-
-        pitch_proj = self.pitch_proj(pitch_hat)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
-
-        energy_proj = self.energy_proj(energy_hat)
-        energy_proj = energy_proj.transpose(1, 2)
-        x = x + energy_proj * self.energy_strength
-
-        x = self.lr(x, dur)
-
-        x, _ = self.lstm(x)
-
-        x = self.lin(x)
-        x = x.transpose(1, 2)
-
-        x_post = self.postnet(x)
-        x_post = self.post_proj(x_post)
-        x_post = x_post.transpose(1, 2)
-
-        x, x_post, dur = x.squeeze(), x_post.squeeze(), dur.squeeze()
-        x = x.cpu().data.numpy()
-        x_post = x_post.cpu().data.numpy()
-        dur = dur.cpu().data.numpy()
-
-        return {'mel': x, 'mel_post': x_post, 'dur': dur,
-                'pitch': pitch_hat, 'energy': energy_hat}
+        with torch.no_grad():
+            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_hat = dur_hat.squeeze(2)
+            if torch.sum(dur_hat.long()) <= 0:
+                torch.fill_(dur_hat, value=2.)
+            pitch_hat = self.pitch_pred(x).transpose(1, 2)
+            pitch_hat = pitch_function(pitch_hat)
+            energy_hat = self.energy_pred(x).transpose(1, 2)
+            energy_hat = energy_function(energy_hat)
+            return self._generate_mel(x=x, dur_hat=dur_hat,
+                                      pitch_hat=pitch_hat,
+                                      energy_hat=energy_hat)
 
     @torch.jit.export
     def generate_jit(self,
                      x: torch.Tensor,
-                     alpha: float = 1.0) -> Dict[str, torch.Tensor]:
+                     alpha: float = 1.0,
+                     beta: float = 1.0) -> Dict[str, torch.Tensor]:
+        with torch.no_grad():
+            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_hat = dur_hat.squeeze(2)
+            if torch.sum(dur_hat.long()) <= 0:
+                torch.fill_(dur_hat, value=2.)
+            pitch_hat = self.pitch_pred(x).transpose(1, 2) * beta
+            energy_hat = self.energy_pred(x).transpose(1, 2)
+            return self._generate_mel(x=x, dur_hat=dur_hat,
+                                      pitch_hat=pitch_hat,
+                                      energy_hat=energy_hat)
 
-        dur = self.dur_pred(x, alpha=alpha)
-        dur = dur.squeeze(2)
+    def get_step(self) -> int:
+        return self.step.data.item()
 
-        # Fixing breaking synth of silent texts
-        if torch.sum(dur.long()) <= 0:
-            dur = torch.full(x.size(), fill_value=2, device=x.device)
-
-        pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        energy_hat = self.energy_pred(x).transpose(1, 2)
-
+    def _generate_mel(self,
+                      x: torch.Tensor,
+                      dur_hat: torch.Tensor,
+                      pitch_hat: torch.Tensor,
+                      energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -269,7 +246,7 @@ class ForwardTacotron(nn.Module):
         energy_proj = energy_proj.transpose(1, 2)
         x = x + energy_proj * self.energy_strength
 
-        x = self.lr(x, dur)
+        x = self.lr(x, dur_hat)
 
         x, _ = self.lstm(x)
 
@@ -280,18 +257,16 @@ class ForwardTacotron(nn.Module):
         x_post = self.post_proj(x_post)
         x_post = x_post.transpose(1, 2)
 
-        x, x_post, dur = x.squeeze(), x_post.squeeze(), dur.squeeze()
+        x, x_post, dur = x.squeeze(), x_post.squeeze(), dur_hat.squeeze()
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur,
                 'pitch': pitch_hat, 'energy': energy_hat}
 
-    def pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
+    def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
         x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', self.padding_value)
         return x
 
-    def get_step(self) -> int:
-        return self.step.data.item()
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'ForwardTacotron':
