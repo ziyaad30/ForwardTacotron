@@ -145,6 +145,9 @@ python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt w
 
 Here is a dummy example of exporting the model in torchscript:
 ```
+import torch
+from models.forward_tacotron import ForwardTacotron
+
 tts_model = ForwardTacotron.from_checkpoint('checkpoints/ljspeech_tts.forward/latest_model.pt')
 tts_model.eval()
 model_script = torch.jit.script(tts_model)
