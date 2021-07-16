@@ -21,7 +21,7 @@ does not use any attention. Hence, the required memory grows linearly with text 
 ## UPDATE V2 --> V3 (16.07.2020)
 - Updated model architecture resulting in better synth quality and more param control
 - Less overfitting due to dropout in encoder layers
-- Model can now be [exported with torchscript] (#export-model-with-torchscript)
+- Model can now be [exported with torchscript](#export-model-with-torchscript)
 
 
 Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
