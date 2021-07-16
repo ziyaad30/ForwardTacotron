@@ -114,10 +114,10 @@ if __name__ == '__main__':
 
         m = gen['mel_post']
         if args.vocoder == 'melgan':
-            m = torch.tensor(m).unsqueeze(0)
+            m = m.cpu().unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
         if args.vocoder == 'wavernn':
-            m = torch.tensor(m).unsqueeze(0)
+            m = m.cpu().unsqueeze(0)
             wav = voc_model.generate(mels=m,
                                      batched=True,
                                      target=args.target,
@@ -125,7 +125,7 @@ if __name__ == '__main__':
                                      mu_law=voc_dsp.mu_law)
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
         elif args.vocoder == 'griffinlim':
-            wav = dsp.griffinlim(m)
+            wav = dsp.griffinlim(m.cpu().numpy())
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
 
     print('\n\nDone.\n')
