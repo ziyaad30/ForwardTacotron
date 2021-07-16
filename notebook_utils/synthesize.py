@@ -39,7 +39,7 @@ class Synthesizer:
         x = self.tokenizer(x)
         x = torch.tensor(x).unsqueeze(0)
         gen = self.tts_model.generate(x,
-                                      duration_alpha=alpha,
+                                      alpha=alpha,
                                       pitch_function=pitch_function,
                                       energy_function=energy_function)
         if voc_model == 'griffinlim':
