@@ -282,6 +282,7 @@ class ForwardTacotron(nn.Module):
         model.load_state_dict(checkpoint['model'])
         return model
 
+
 if __name__ == '__main__':
     from dp.utils.io import read_config
 
