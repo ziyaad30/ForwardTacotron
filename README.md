@@ -143,7 +143,7 @@ python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt w
 
 ## Export Model with TorchScript
 
-Here is a dummy example of exporting the model in torchscript:
+Here is a dummy example of exporting the model in TorchScript:
 ```
 import torch
 from models.forward_tacotron import ForwardTacotron
