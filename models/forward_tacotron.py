@@ -281,17 +281,3 @@ class ForwardTacotron(nn.Module):
         model = ForwardTacotron.from_config(checkpoint['config'])
         model.load_state_dict(checkpoint['model'])
         return model
-
-
-if __name__ == '__main__':
-    from dp.utils.io import read_config
-
-    config = read_config('../config.yaml')
-    tts_model = ForwardTacotron.from_config(config)
-    tts_model.eval()
-
-    model_script = torch.jit.script(tts_model)
-
-    x = torch.ones((1, 5)).long()
-    y = model_script.generate_jit(x)
-    print(y)

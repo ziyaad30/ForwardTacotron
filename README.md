@@ -18,10 +18,11 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## MAJOR UPDATE V1 --> V2 (10.05.2020)
-- Added optional energy conditioning similar to the one in FastSpeech2
-- Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
-- Major refactoring, added tests etc.
+## UPDATE V2 --> V3 (16.07.2020)
+- Updated model architecture resulting in better synth quality and more param control
+- Less overfitting due to dropout in encoder layers
+- Model can now be [exported with torchscript] (#export-model-with-torchscript)
+
 
 Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
 
@@ -139,6 +140,21 @@ python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt w
 
 ```
 
+
+## Export model with TorchScript
+
+Here is a dummy example of exporting the model in torchscript:
+```
+tts_model = ForwardTacotron.from_checkpoint('checkpoints/ljspeech_tts.forward/latest_model.pt')
+tts_model.eval()
+model_script = torch.jit.script(tts_model)
+x = torch.ones((1, 5)).long()
+y = model_script.generate_jit(x)
+```
+For the necessary preprocessing steps (text to tokens) please refer to:
+```
+gen_forward.py
+```
 
 ## Tips for training a WaveRNN model
 
