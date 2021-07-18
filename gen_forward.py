@@ -1,7 +1,7 @@
 import argparse
+import numpy as np
 from pathlib import Path
 from typing import Tuple, Dict, Any
-
 import torch
 
 from models.fatchord_version import WaveRNN
@@ -55,11 +55,12 @@ if __name__ == '__main__':
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
+    hifigan_parser = subparsers.add_parser('hifigan')
 
     args = parser.parse_args()
 
-    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan'}, \
-        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\']'
+    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan', 'hifigan'}, \
+        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\', \'hifigan\']'
 
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
@@ -116,6 +117,9 @@ if __name__ == '__main__':
         if args.vocoder == 'melgan':
             m = m.cpu().unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
+        if args.vocoder == 'hifigan':
+            m = m.cpu().unsqueeze(0)
+            np.save(out_path / f'{wav_name}.npy', m, allow_pickle=False)
         if args.vocoder == 'wavernn':
             m = m.cpu().unsqueeze(0)
             wav = voc_model.generate(mels=m,
