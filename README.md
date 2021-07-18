@@ -82,11 +82,15 @@ python train_forward.py
 ```
 python gen_forward.py --alpha 1 --input_text 'this is whatever you want it to be' griffinlim
 ```
-If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) or [HiFiGAN](https://github.com/jik876/hifi-gan) vocoder, you can produce .mel files with:
+If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, you can produce .mel files with:
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' melgan
 ```
-To vocode the resulting .mel files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
+If you want to use the [HiFiGAN](https://github.com/jik876/hifi-gan) vocoder, you can produce .npy files with:
+```
+python gen_forward.py --input_text 'this is whatever you want it to be' hifigan
+```
+To vocode the resulting .mel or .npy files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
 
 As in the original repo you can also use a trained WaveRNN vocoder:
 ```
