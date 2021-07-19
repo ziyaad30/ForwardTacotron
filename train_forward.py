@@ -1,7 +1,9 @@
 import argparse
 import itertools
 import os
+import subprocess
 from pathlib import Path
+from typing import Union
 
 import torch
 from torch import optim
@@ -17,6 +19,14 @@ from utils.display import *
 from utils.dsp import DSP
 from utils.files import read_config
 from utils.paths import Paths
+
+
+def try_get_git_hash() -> Union[str, None]:
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    except Exception as e:
+        print(f'Could not retrieve git hash! {e}')
+        return None
 
 
 def create_gta_features(model: Tacotron,
@@ -48,6 +58,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = read_config(args.config)
+    if 'git_hash' not in config or config['git_hash'] is None:
+        config['git_hash'] = try_get_git_hash()
     dsp = DSP.from_config(config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
