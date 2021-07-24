@@ -208,8 +208,8 @@ class ForwardTrainer:
 
         gen = model.generate(batch['x'][0:1, :batch['x_len'][0]])
 
-        m1_hat_fig = plot_mel(gen['mel'])
-        m2_hat_fig = plot_mel(gen['mel_post'])
+        m1_hat_fig = plot_mel(np_now(gen['mel']))
+        m2_hat_fig = plot_mel(np_now(gen['mel_post']))
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
