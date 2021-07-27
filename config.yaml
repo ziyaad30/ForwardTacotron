@@ -123,7 +123,7 @@ forward_tacotron:
 
     prenet_layers: 4
     prenet_heads: 2
-    prenet_fft: 1536
+    prenet_fft: 1024
     prenet_dropout: 0.1
 
     postnet_layers: 4
@@ -131,7 +131,7 @@ forward_tacotron:
     postnet_fft: 1536
     postnet_dropout: 0.1
 
-    d_model: 384
+    d_model: 256
 
   training:
     schedule:
