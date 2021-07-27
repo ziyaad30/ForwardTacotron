@@ -290,8 +290,10 @@ class ForwardTacotron(nn.Module):
 
         x = self.lr(x, dur)
 
-        x_abs = torch.sum(torch.abs(x), dim=-1)
-        len_mask = make_len_mask(x_abs.transpose(0, 1))
+        len_mask = torch.zeros((x.size(0), x.size(1))).bool()
+        for i, mel_len in enumerate(mel_lens):
+            len_mask[i, mel_len:] = True
+
         x = self.postnet(x, src_pad_mask=len_mask)
 
         x = self.lin(x)
@@ -323,9 +325,8 @@ class ForwardTacotron(nn.Module):
         energy_hat = self.energy_pred(x).transpose(1, 2)
         energy_hat = energy_function(energy_hat)
 
-        len_mask = make_len_mask(x.transpose(0, 1))
         x = self.embedding(x)
-        x = self.prenet(x, src_pad_mask=len_mask)
+        x = self.prenet(x, src_pad_mask=None)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -337,9 +338,7 @@ class ForwardTacotron(nn.Module):
 
         x = self.lr(x, dur)
 
-        x_abs = torch.sum(torch.abs(x), dim=-1)
-        len_mask = make_len_mask(x_abs.transpose(0, 1))
-        x = self.postnet(x, src_pad_mask=len_mask)
+        x = self.postnet(x, src_pad_mask=None)
 
         x = self.lin(x)
         x = x.transpose(1, 2)

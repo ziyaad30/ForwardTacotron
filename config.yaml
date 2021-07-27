@@ -1,6 +1,6 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'asvoice2_jit_add_fastpitch_tts'
+tts_model_id: 'asvoice2_jit_add_fastpitch_fixmask_tts'
 
 data_path: 'data/' # output data path
 
