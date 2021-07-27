@@ -290,7 +290,7 @@ class ForwardTacotron(nn.Module):
 
         x = self.lr(x, dur)
 
-        len_mask = torch.zeros((x.size(0), x.size(1))).bool()
+        len_mask = torch.zeros((x.size(0), x.size(1))).bool().to(x.device)
         for i, mel_len in enumerate(mel_lens):
             len_mask[i, mel_len:] = True
 
