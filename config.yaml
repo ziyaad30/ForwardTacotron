@@ -121,17 +121,17 @@ forward_tacotron:
     energy_dropout: 0.5
     energy_strength: 0.
 
-    prenet_layers: 4
+    prenet_layers: 6
     prenet_heads: 2
-    prenet_fft: 1024
+    prenet_fft: 1536
     prenet_dropout: 0.1
 
-    postnet_layers: 4
+    postnet_layers: 6
     postnet_heads: 2
-    postnet_fft: 1024
+    postnet_fft: 1536
     postnet_dropout: 0.1
 
-    d_model: 256
+    d_model: 384
 
   training:
     schedule:
