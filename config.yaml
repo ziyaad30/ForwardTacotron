@@ -1,6 +1,6 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'asvoice2_jit_add_transformer_tts'
+tts_model_id: 'asvoice2_jit_add_fastpitch_tts'
 
 data_path: 'data/' # output data path
 
@@ -114,25 +114,24 @@ forward_tacotron:
     pitch_conv_dims: 256
     pitch_rnn_dims: 128
     pitch_dropout: 0.5
-    pitch_strength: 1.
+    pitch_strength: 0.
 
     energy_conv_dims: 256
     energy_rnn_dims: 64
     energy_dropout: 0.5
     energy_strength: 0.
 
-    prenet_dims: 256
     prenet_layers: 6
     prenet_heads: 2
     prenet_fft: 1024
     prenet_dropout: 0.1
 
-    rnn_dims: 512
+    postnet_layers: 6
+    postnet_heads: 2
+    postnet_fft: 1024
+    postnet_dropout: 0.1
 
-    postnet_dims: 256
-    postnet_k: 8
-    postnet_num_highways: 4
-    postnet_dropout: 0.
+    d_model: 512
 
   training:
     schedule:
@@ -147,7 +146,7 @@ forward_tacotron:
     max_mel_len: 1250              # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0            # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10_000        # checkpoints the model every X steps
-    plot_every: 1000
+    plot_every: 1
 
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
