@@ -158,28 +158,25 @@ class ForwardTransformer(torch.nn.Module):
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
+    def __init__(self,
+                 num_chars: int,
+                 d_model: int,
+                 n_heads: int,
+                 d_fft: int,
+                 layers: int,
+                 dropout=0.1):
         super().__init__()
-        self.embedding = Embedding(num_chars, emb_dim)
-        self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-        ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
-        self.dropout = dropout
+        self.embedding = Embedding(num_chars, d_model)
+        self.transformer = ForwardTransformer(heads=n_heads, dropout=dropout,
+                                              d_model=d_model, d_fft=d_fft, layers=layers)
+        self.lin = nn.Linear(d_model, 1)
 
     def forward(self,
                 x: torch.Tensor,
+                src_pad_mask=None,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
-        x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
+        x = self.transformer(x, src_pad_mask=src_pad_mask)
         x = self.lin(x)
         return x / alpha
 
@@ -203,19 +200,28 @@ class BatchNormConv(nn.Module):
 class ForwardTacotron(nn.Module):
 
     def __init__(self,
-                 series_embed_dims: int,
                  num_chars: int,
-                 durpred_conv_dims: int,
-                 durpred_rnn_dims: int,
                  durpred_dropout: float,
-                 pitch_conv_dims: int,
-                 pitch_rnn_dims: int,
+                 durpred_d_model: int,
+                 durpred_n_heads: int,
+                 durpred_layers: int,
+                 durpred_d_fft: int,
+
                  pitch_dropout: float,
-                 pitch_strength: float,
-                 energy_conv_dims: int,
-                 energy_rnn_dims: int,
+                 pitch_d_model: int,
+                 pitch_n_heads: int,
+                 pitch_layers: int,
+                 pitch_d_fft: int,
+
                  energy_dropout: float,
+                 energy_d_model: int,
+                 energy_n_heads: int,
+                 energy_layers: int,
+                 energy_d_fft: int,
+
+                 pitch_strength: float,
                  energy_strength: float,
+
                  postnet_layers: int,
                  postnet_heads: int,
                  postnet_fft: int,
@@ -231,19 +237,22 @@ class ForwardTacotron(nn.Module):
         self.padding_value = padding_value
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
-                                        emb_dim=series_embed_dims,
-                                        conv_dims=durpred_conv_dims,
-                                        rnn_dims=durpred_rnn_dims,
+                                        d_model=durpred_d_model,
+                                        n_heads=durpred_n_heads,
+                                        layers=durpred_layers,
+                                        d_fft=durpred_d_fft,
                                         dropout=durpred_dropout)
         self.pitch_pred = SeriesPredictor(num_chars=num_chars,
-                                          emb_dim=series_embed_dims,
-                                          conv_dims=pitch_conv_dims,
-                                          rnn_dims=pitch_rnn_dims,
+                                          d_model=pitch_d_model,
+                                          n_heads=pitch_n_heads,
+                                          layers=pitch_layers,
+                                          d_fft=pitch_d_fft,
                                           dropout=pitch_dropout)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
-                                           emb_dim=series_embed_dims,
-                                           conv_dims=energy_conv_dims,
-                                           rnn_dims=energy_rnn_dims,
+                                           d_model=energy_d_model,
+                                           n_heads=energy_n_heads,
+                                           layers=energy_layers,
+                                           d_fft=energy_d_fft,
                                            dropout=energy_dropout)
 
         self.embedding = Embedding(num_embeddings=num_chars, embedding_dim=d_model)

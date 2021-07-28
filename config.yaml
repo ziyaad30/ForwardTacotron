@@ -1,6 +1,6 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'asvoice2_jit_add_fastpitch_fixmask_3_tts'
+tts_model_id: 'asvoice2_jit_add_fastpitch2_tts'
 
 data_path: 'data/' # output data path
 
@@ -106,19 +106,24 @@ tacotron:
 forward_tacotron:
 
   model:
-    series_embed_dims: 64       # grapheme embedding dimension for series predictor
-    durpred_conv_dims: 256
-    durpred_rnn_dims: 64
-    durpred_dropout: 0.5
+    durpred_dropout: 0.1
+    durpred_d_model: 256
+    durpred_n_heads: 4
+    durpred_layers: 2
+    durpred_d_fft: 512
 
-    pitch_conv_dims: 256
-    pitch_rnn_dims: 128
-    pitch_dropout: 0.5
-    pitch_strength: 0.
+    pitch_dropout: 0.1
+    pitch_d_model: 256
+    pitch_n_heads: 4
+    pitch_layers: 2
+    pitch_d_fft: 512
+    pitch_strength: 1.0
 
-    energy_conv_dims: 256
-    energy_rnn_dims: 64
-    energy_dropout: 0.5
+    energy_dropout: 0.1
+    energy_d_model: 256
+    energy_n_heads: 4
+    energy_layers: 2
+    energy_d_fft: 512
     energy_strength: 0.
 
     prenet_layers: 4
