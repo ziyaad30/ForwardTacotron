@@ -1,11 +1,12 @@
 import time
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Union
 
 import torch
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import  save_checkpoint
@@ -26,11 +27,12 @@ class ForwardTrainer:
         self.paths = paths
         self.dsp = dsp
         self.config = config
-        self.train_cfg = config['forward_tacotron']['training']
+        model_type = config.get('tts_model', 'forward_tacotron')
+        self.train_cfg = config[model_type]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
 
-    def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
+    def train(self, model: Union[ForwardTacotron, FastPitch], optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
         forward_schedule = parse_schedule(forward_schedule)
         for i, session_params in enumerate(forward_schedule, 1):
