@@ -3,6 +3,21 @@ from typing import List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
+
+
+class LengthRegulator(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x: torch.Tensor, dur: torch.Tensor) -> torch.Tensor:
+        x_expanded = []
+        for i in range(x.size(0)):
+            x_exp = torch.repeat_interleave(x[i], (dur[i] + 0.5).long(), dim=0)
+            x_expanded.append(x_exp)
+        x_expanded = pad_sequence(x_expanded, padding_value=0., batch_first=True)
+        return x_expanded
 
 
 class HighwayNetwork(nn.Module):
