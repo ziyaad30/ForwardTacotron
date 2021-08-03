@@ -145,7 +145,7 @@ fast_pitch:
     energy_n_heads: 4
     energy_layers: 1
     energy_d_fft: 128
-    energy_dropout: 0.1
+    energy_dropout: 0.5
     energy_strength: 0.
 
     d_model: 256
