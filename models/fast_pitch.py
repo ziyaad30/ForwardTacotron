@@ -280,7 +280,7 @@ class FastPitch(nn.Module):
                  x: torch.Tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
-                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, np.array]:
+                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
 
         dur = self.dur_pred(x, alpha=alpha)
@@ -315,9 +315,6 @@ class FastPitch(nn.Module):
         x = x.transpose(1, 2)
 
         x, x_post, dur = x.squeeze(), x.squeeze(), dur.squeeze()
-        x = x.cpu().data.numpy()
-        x_post = x_post.cpu().data.numpy()
-        dur = dur.cpu().data.numpy()
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur,
                 'pitch': pitch_hat, 'energy': energy_hat}
