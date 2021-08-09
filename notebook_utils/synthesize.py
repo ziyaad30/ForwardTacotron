@@ -3,7 +3,7 @@ import numpy as np
 from typing import Callable
 
 from models.fatchord_version import WaveRNN
-from models.forward_tacotron import ForwardTacotron
+from utils.checkpoints import init_tts_model
 from utils.dsp import DSP
 from utils.text.cleaners import Cleaner
 from utils.text.tokenizer import Tokenizer
@@ -18,7 +18,7 @@ class Synthesizer:
         self.device = torch.device(device)
         tts_checkpoint = torch.load(tts_path, map_location=self.device)
         tts_config = tts_checkpoint['config']
-        tts_model = ForwardTacotron.from_config(tts_config)
+        tts_model = init_tts_model(tts_config)
         tts_model.load_state_dict(tts_checkpoint['model'])
         self.tts_model = tts_model
         self.wavernn = WaveRNN.from_checkpoint(voc_path)
