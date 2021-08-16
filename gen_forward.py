@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 from typing import Tuple, Dict, Any
-
+import numpy as np
 import torch
 
 from models.fatchord_version import WaveRNN
@@ -57,10 +57,11 @@ if __name__ == '__main__':
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
+    mg_parser = subparsers.add_parser('hifigan')
 
     args = parser.parse_args()
 
-    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan'}, \
+    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan', 'hifigan'}, \
         'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\']'
 
     checkpoint_path = args.checkpoint
@@ -109,15 +110,21 @@ if __name__ == '__main__':
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
         wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
-        with torch.no_grad():
-            gen = tts_model.generate(x=x, alpha=args.alpha)
 
-        m = gen['mel_post'].cpu().numpy()
+        gen = tts_model.generate(x=x,
+                                 alpha=args.alpha,
+                                 pitch_function=pitch_function,
+                                 energy_function=energy_function)
+
+        m = gen['mel_post']
         if args.vocoder == 'melgan':
-            m = torch.tensor(m).unsqueeze(0)
+            m = m.cpu().unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
+        if args.vocoder == 'hifigan':
+            m = m.cpu().unsqueeze(0).numpy()
+            np.save(out_path / f'{wav_name}.npy', m, allow_pickle=False)
         if args.vocoder == 'wavernn':
-            m = torch.tensor(m).unsqueeze(0)
+            m = m.cpu().unsqueeze(0)
             wav = voc_model.generate(mels=m,
                                      batched=True,
                                      target=args.target,
@@ -125,7 +132,7 @@ if __name__ == '__main__':
                                      mu_law=voc_dsp.mu_law)
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
         elif args.vocoder == 'griffinlim':
-            wav = dsp.griffinlim(m)
+            wav = dsp.griffinlim(m.cpu().numpy())
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
 
     print('\n\nDone.\n')

@@ -283,38 +283,39 @@ class FastPitch(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
 
-        dur = self.dur_pred(x, alpha=alpha)
-        dur = dur.squeeze(2)
+        with torch.no_grad():
+            dur = self.dur_pred(x, alpha=alpha)
+            dur = dur.squeeze(2)
 
-        # Fixing breaking synth of silent texts
-        if torch.sum(dur) <= 0:
-            dur = torch.full(x.size(), fill_value=2, device=x.device)
+            # Fixing breaking synth of silent texts
+            if torch.sum(dur) <= 0:
+                dur = torch.full(x.size(), fill_value=2, device=x.device)
 
-        pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        pitch_hat = pitch_function(pitch_hat)
+            pitch_hat = self.pitch_pred(x).transpose(1, 2)
+            pitch_hat = pitch_function(pitch_hat)
 
-        energy_hat = self.energy_pred(x).transpose(1, 2)
-        energy_hat = energy_function(energy_hat)
+            energy_hat = self.energy_pred(x).transpose(1, 2)
+            energy_hat = energy_function(energy_hat)
 
-        x = self.embedding(x)
-        x = self.prenet(x, src_pad_mask=None)
+            x = self.embedding(x)
+            x = self.prenet(x, src_pad_mask=None)
 
-        pitch_proj = self.pitch_proj(pitch_hat)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
+            pitch_proj = self.pitch_proj(pitch_hat)
+            pitch_proj = pitch_proj.transpose(1, 2)
+            x = x + pitch_proj * self.pitch_strength
 
-        energy_proj = self.energy_proj(energy_hat)
-        energy_proj = energy_proj.transpose(1, 2)
-        x = x + energy_proj * self.energy_strength
+            energy_proj = self.energy_proj(energy_hat)
+            energy_proj = energy_proj.transpose(1, 2)
+            x = x + energy_proj * self.energy_strength
 
-        x = self.lr(x, dur)
+            x = self.lr(x, dur)
 
-        x = self.postnet(x, src_pad_mask=None)
+            x = self.postnet(x, src_pad_mask=None)
 
-        x = self.lin(x)
-        x = x.transpose(1, 2)
+            x = self.lin(x)
+            x = x.transpose(1, 2)
 
-        x, x_post, dur = x.squeeze(), x.squeeze(), dur.squeeze()
+            x, x_post, dur = x.squeeze(), x.squeeze(), dur.squeeze()
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur,
                 'pitch': pitch_hat, 'energy': energy_hat}
