@@ -129,24 +129,24 @@ fast_pitch:
 
   model:
     durpred_d_model: 128
-    durpred_n_heads: 4
-    durpred_layers: 3
+    durpred_n_heads: 2
+    durpred_layers: 4
     durpred_d_fft: 128
     durpred_dropout: 0.5
 
     pitch_d_model: 128
-    pitch_n_heads: 4
-    pitch_layers: 3
+    pitch_n_heads: 2
+    pitch_layers: 4
     pitch_d_fft: 128
     pitch_dropout: 0.5
     pitch_strength: 1.0
 
     energy_d_model: 128
-    energy_n_heads: 4
-    energy_layers: 1
+    energy_n_heads: 2
+    energy_layers: 4
     energy_d_fft: 128
     energy_dropout: 0.5
-    energy_strength: 0.
+    energy_strength: 1.0
 
     d_model: 256
     conv1_kernel: 9
