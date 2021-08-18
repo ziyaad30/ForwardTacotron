@@ -116,15 +116,12 @@ if __name__ == '__main__':
                                  pitch_function=pitch_function,
                                  energy_function=energy_function)
 
-        m = gen['mel_post']
+        m = gen['mel_post'].cpu()
         if args.vocoder == 'melgan':
-            m = m.cpu().unsqueeze(0)
             torch.save(m, out_path / f'{wav_name}.mel')
         if args.vocoder == 'hifigan':
-            m = m.cpu().unsqueeze(0).numpy()
-            np.save(out_path / f'{wav_name}.npy', m, allow_pickle=False)
+            np.save(out_path / f'{wav_name}.npy', m.numpy(), allow_pickle=False)
         if args.vocoder == 'wavernn':
-            m = m.cpu().unsqueeze(0)
             wav = voc_model.generate(mels=m,
                                      batched=True,
                                      target=args.target,
@@ -132,7 +129,7 @@ if __name__ == '__main__':
                                      mu_law=voc_dsp.mu_law)
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
         elif args.vocoder == 'griffinlim':
-            wav = dsp.griffinlim(m.cpu().numpy())
+            wav = dsp.griffinlim(m.squeeze().numpy())
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
 
     print('\n\nDone.\n')

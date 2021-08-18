@@ -282,43 +282,18 @@ class FastPitch(nn.Module):
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
-
         with torch.no_grad():
-            dur = self.dur_pred(x, alpha=alpha)
-            dur = dur.squeeze(2)
-
-            # Fixing breaking synth of silent texts
-            if torch.sum(dur) <= 0:
-                dur = torch.full(x.size(), fill_value=2, device=x.device)
-
+            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_hat = dur_hat.squeeze(2)
+            if torch.sum(dur_hat.long()) <= 0:
+                torch.fill_(dur_hat, value=2.)
             pitch_hat = self.pitch_pred(x).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
-
             energy_hat = self.energy_pred(x).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
-
-            x = self.embedding(x)
-            x = self.prenet(x, src_pad_mask=None)
-
-            pitch_proj = self.pitch_proj(pitch_hat)
-            pitch_proj = pitch_proj.transpose(1, 2)
-            x = x + pitch_proj * self.pitch_strength
-
-            energy_proj = self.energy_proj(energy_hat)
-            energy_proj = energy_proj.transpose(1, 2)
-            x = x + energy_proj * self.energy_strength
-
-            x = self.lr(x, dur)
-
-            x = self.postnet(x, src_pad_mask=None)
-
-            x = self.lin(x)
-            x = x.transpose(1, 2)
-
-            x, x_post, dur = x.squeeze(), x.squeeze(), dur.squeeze()
-
-        return {'mel': x, 'mel_post': x_post, 'dur': dur,
-                'pitch': pitch_hat, 'energy': energy_hat}
+            return self._generate_mel(x=x, dur_hat=dur_hat,
+                                      pitch_hat=pitch_hat,
+                                      energy_hat=energy_hat)
 
     def pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
@@ -327,6 +302,35 @@ class FastPitch(nn.Module):
 
     def get_step(self) -> int:
         return self.step.data.item()
+
+    def _generate_mel(self,
+                      x: torch.Tensor,
+                      dur_hat: torch.Tensor,
+                      pitch_hat: torch.Tensor,
+                      energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
+
+        len_mask = make_len_mask(x.transpose(0, 1))
+
+        x = self.embedding(x)
+        x = self.prenet(x, src_pad_mask=len_mask)
+
+        pitch_proj = self.pitch_proj(pitch_hat)
+        pitch_proj = pitch_proj.transpose(1, 2)
+        x = x + pitch_proj * self.pitch_strength
+
+        energy_proj = self.energy_proj(energy_hat)
+        energy_proj = energy_proj.transpose(1, 2)
+        x = x + energy_proj * self.energy_strength
+
+        x = self.lr(x, dur_hat)
+
+        x = self.postnet(x, src_pad_mask=None)
+
+        x = self.lin(x)
+        x = x.transpose(1, 2)
+
+        return {'mel': x, 'mel_post': x, 'dur': dur_hat,
+                'pitch': pitch_hat, 'energy': energy_hat}
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'FastPitch':
