@@ -207,9 +207,11 @@ class ForwardTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         gen = model.generate(batch['x'][0:1, :batch['x_len'][0]])
+        m1_hat = np_now(gen['mel'].squeeze())
+        m2_hat = np_now(gen['mel_post'].squeeze())
 
-        m1_hat_fig = plot_mel(np_now(gen['mel']))
-        m2_hat_fig = plot_mel(np_now(gen['mel_post']))
+        m1_hat_fig = plot_mel(m1_hat)
+        m2_hat_fig = plot_mel(m2_hat)
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
