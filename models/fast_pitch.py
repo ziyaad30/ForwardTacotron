@@ -40,8 +40,15 @@ def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
     return mask
 
 
-def make_len_mask(inp: torch.Tensor) -> torch.Tensor:
-    return (inp == 0).transpose(0, 1)
+def make_token_len_mask(x: torch.Tensor) -> torch.Tensor:
+    return (x == 0).transpose(0, 1)
+
+
+def make_mel_len_mask(x: torch.Tensor, mel_lens: torch.Tensor) -> torch.Tensor:
+    len_mask = torch.zeros((x.size(0), x.size(1))).bool().to(x.device)
+    for i, mel_len in enumerate(mel_lens):
+        len_mask[i, mel_len:] = True
+    return len_mask
 
 
 class FFTBlock(nn.Module):
@@ -243,7 +250,7 @@ class FastPitch(nn.Module):
         if self.training:
             self.step += 1
 
-        len_mask = make_len_mask(x.transpose(0, 1))
+        len_mask = make_token_len_mask(x.transpose(0, 1))
         dur_hat = self.dur_pred(x, src_pad_mask=len_mask).squeeze(-1)
         pitch_hat = self.pitch_pred(x, src_pad_mask=len_mask).transpose(1, 2)
         energy_hat = self.energy_pred(x, src_pad_mask=len_mask).transpose(1, 2)
@@ -309,7 +316,7 @@ class FastPitch(nn.Module):
                       pitch_hat: torch.Tensor,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
 
-        len_mask = make_len_mask(x.transpose(0, 1))
+        len_mask = make_token_len_mask(x.transpose(0, 1))
 
         x = self.embedding(x)
         x = self.prenet(x, src_pad_mask=len_mask)
