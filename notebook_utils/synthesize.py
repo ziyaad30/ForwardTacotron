@@ -44,7 +44,7 @@ class Synthesizer:
                                       energy_function=energy_function)
         m = gen['mel_post'].cpu()
         if voc_model == 'griffinlim':
-            wav = self.dsp.griffinlim(m.numpy(), n_iter=32)
+            wav = self.dsp.griffinlim(m.squeeze().numpy(), n_iter=32)
         elif voc_model == 'wavernn':
             wav = self.wavernn.generate(mels=m,
                                         batched=True,
