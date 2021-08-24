@@ -42,17 +42,17 @@ class Synthesizer:
                                       alpha=alpha,
                                       pitch_function=pitch_function,
                                       energy_function=energy_function)
+        m = gen['mel_post'].cpu()
         if voc_model == 'griffinlim':
-            wav = self.dsp.griffinlim(gen['mel_post'], n_iter=32)
+            wav = self.dsp.griffinlim(m.numpy(), n_iter=32)
         elif voc_model == 'wavernn':
-            m = torch.tensor(gen['mel_post']).unsqueeze(0)
             wav = self.wavernn.generate(mels=m,
                                         batched=True,
                                         target=11_000,
                                         overlap=550,
                                         mu_law=self.dsp.mu_law)
         else:
-            m = torch.tensor(gen['mel_post']).unsqueeze(0).cuda()
+            m = m.cuda()
             with torch.no_grad():
                 wav = self.melgan.inference(m).cpu().numpy()
         return wav
