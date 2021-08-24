@@ -1,9 +1,9 @@
-import numpy as np
+from pathlib import Path
+from typing import Union, Dict, Any, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pathlib import Path
-from typing import Union, Dict, Any, Tuple
 
 from models.common_layers import CBHG
 from utils.text.symbols import phonemes

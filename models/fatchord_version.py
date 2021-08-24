@@ -1,12 +1,14 @@
+from pathlib import Path
+from typing import Union
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.distribution import sample_from_discretized_mix_logistic
+
 from utils.display import *
+from utils.distribution import sample_from_discretized_mix_logistic
 from utils.dsp import *
-import numpy as np
-from pathlib import Path
-from typing import Union
 
 
 class ResBlock(nn.Module):
