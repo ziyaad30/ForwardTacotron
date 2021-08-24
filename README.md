@@ -18,10 +18,11 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## MAJOR UPDATE V1 --> V2 (10.05.2020)
-- Added optional energy conditioning similar to the one in FastSpeech2
-- Replaced hparams.py with config.yaml that is now stored in the model and loaded automatically
-- Major refactoring, added tests etc.
+## UPDATE V2 --> V3 (16.07.2020)
+- Updated model architecture resulting in better synth quality and more param control
+- Less overfitting due to regularized encoder layers
+- Model can now be [exported with torchscript](#export-model-with-torchscript)
+- Git hash is stored in the model config to backtrace compatibility
 
 Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
 
@@ -81,11 +82,15 @@ python train_forward.py
 ```
 python gen_forward.py --alpha 1 --input_text 'this is whatever you want it to be' griffinlim
 ```
-If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) or [HiFiGAN](https://github.com/jik876/hifi-gan) vocoder, you can produce .mel files with:
+If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, you can produce .mel files with:
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' melgan
 ```
-To vocode the resulting .mel files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
+If you want to use the [HiFiGAN](https://github.com/jik876/hifi-gan) vocoder, you can produce .npy files with:
+```
+python gen_forward.py --input_text 'this is whatever you want it to be' hifigan
+```
+To vocode the resulting .mel or .npy files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
 
 As in the original repo you can also use a trained WaveRNN vocoder:
 ```
@@ -125,7 +130,7 @@ Here is what the ForwardTacotron tensorboard looks like:
 
 | Model | Dataset | Commit |
 |---|---|---|
-|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step80k.pt)| ljspeech | latest |
+|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
 |[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
 
 Our pre-trained LJSpeech model is compatible with the pre-trained vocoders:
@@ -139,6 +144,24 @@ python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt w
 
 ```
 
+
+## Export Model with TorchScript
+
+Here is a dummy example of exporting the model in TorchScript:
+```
+import torch
+from models.forward_tacotron import ForwardTacotron
+
+tts_model = ForwardTacotron.from_checkpoint('checkpoints/ljspeech_tts.forward/latest_model.pt')
+tts_model.eval()
+model_script = torch.jit.script(tts_model)
+x = torch.ones((1, 5)).long()
+y = model_script.generate_jit(x)
+```
+For the necessary preprocessing steps (text to tokens) please refer to:
+```
+gen_forward.py
+```
 
 ## Tips for training a WaveRNN model
 
