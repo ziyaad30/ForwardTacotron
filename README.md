@@ -19,7 +19,7 @@ does not use any attention. Hence, the required memory grows linearly with text 
 
 
 ## UPDATE FastPitch (24.08.2021)
-- Implemented a modified [FastPitch: Parallel Text-to-speech with Pitch Prediction](FastPitch) model as an alternative tts model
+- Implemented a modified [FastPitch](https://arxiv.org/abs/2006.06873) model as an alternative tts model
 - Simply set the tts_model type in the config [fast_pitch, forward_tacotron]
 - Check out the pretrained FastPitch model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)!
 
