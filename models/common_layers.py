@@ -12,6 +12,7 @@ class LengthRegulator(nn.Module):
         super().__init__()
 
     def forward(self, x: torch.Tensor, dur: torch.Tensor) -> torch.Tensor:
+        dur[dur < 0] = 0.
         x_expanded = []
         for i in range(x.size(0)):
             x_exp = torch.repeat_interleave(x[i], (dur[i] + 0.5).long(), dim=0)
