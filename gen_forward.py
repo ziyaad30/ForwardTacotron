@@ -62,7 +62,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     assert args.vocoder in {'griffinlim', 'wavernn', 'melgan', 'hifigan'}, \
-        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\']'
+        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\', \'hifigan\']'
 
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
