@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
-    mg_parser = subparsers.add_parser('hifigan')
+    hg_parser = subparsers.add_parser('hifigan')
 
     args = parser.parse_args()
 
