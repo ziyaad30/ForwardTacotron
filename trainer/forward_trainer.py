@@ -49,7 +49,7 @@ class ForwardTrainer:
                     bs=bs, train_set=train_set, val_set=val_set)
                 self.train_session(model, optimizer, session)
 
-    def train_session(self, model: ForwardTacotron,
+    def train_session(self,  model: Union[ForwardTacotron, FastPitch],
                       optimizer: Optimizer, session: TTSSession) -> None:
         current_step = model.get_step()
         training_steps = session.max_step - current_step
@@ -143,7 +143,7 @@ class ForwardTrainer:
             pitch_loss_avg.reset()
             print(' ')
 
-    def evaluate(self, model: ForwardTacotron, val_set: DataLoader) -> Dict[str, float]:
+    def evaluate(self, model: Union[ForwardTacotron, FastPitch], val_set: DataLoader) -> Dict[str, float]:
         model.eval()
         m_val_loss = 0
         dur_val_loss = 0
@@ -171,7 +171,7 @@ class ForwardTrainer:
         }
 
     @ignore_exception
-    def generate_plots(self, model: ForwardTacotron, session: TTSSession) -> None:
+    def generate_plots(self, model: Union[ForwardTacotron, FastPitch], session: TTSSession) -> None:
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample
