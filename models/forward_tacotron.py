@@ -7,22 +7,8 @@ import torch.nn.functional as F
 from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
-from models.common_layers import CBHG
+from models.common_layers import CBHG, LengthRegulator
 from utils.text.symbols import phonemes
-
-
-class LengthRegulator(nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x: torch.Tensor, dur: torch.Tensor) -> torch.Tensor:
-        x_expanded = []
-        for i in range(x.size(0)):
-            x_exp = torch.repeat_interleave(x[i], (dur[i] + 0.5).long(), dim=0)
-            x_expanded.append(x_exp)
-        x_expanded = pad_sequence(x_expanded, padding_value=0., batch_first=True)
-        return x_expanded
 
 
 class SeriesPredictor(nn.Module):
@@ -140,6 +126,10 @@ class ForwardTacotron(nn.Module):
         self.energy_strength = energy_strength
         self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
         self.energy_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
+
+    def __repr__(self):
+        num_params = sum([np.prod(p.size()) for p in self.parameters()])
+        return f'ForwardTacotron, num params: {num_params}'
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = batch['x']

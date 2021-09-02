@@ -1,11 +1,13 @@
 import argparse
-import numpy as np
 from pathlib import Path
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Union
+import numpy as np
 import torch
 
+from models.fast_pitch import FastPitch
 from models.fatchord_version import WaveRNN
 from models.forward_tacotron import ForwardTacotron
+from utils.checkpoints import init_tts_model
 from utils.display import simple_table
 from utils.dsp import DSP
 from utils.files import read_config
@@ -14,13 +16,14 @@ from utils.text.cleaners import Cleaner
 from utils.text.tokenizer import Tokenizer
 
 
-def load_forward_taco(checkpoint_path: str) -> Tuple[ForwardTacotron, Dict[str, Any]]:
+def load_tts_model(checkpoint_path: str) -> Tuple[Union[ForwardTacotron, FastPitch], Dict[str, Any]]:
     print(f'Loading tts checkpoint {checkpoint_path}')
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
     config = checkpoint['config']
-    tts_model = ForwardTacotron.from_config(config)
+    tts_model = init_tts_model(config)
     tts_model.load_state_dict(checkpoint['model'])
-    print(f'Loaded forward taco with step {tts_model.get_step()}')
+    print(f'Initialized tts model: {tts_model}')
+    print(f'Restored model with step {tts_model.get_step()}')
     return tts_model, config
 
 
@@ -55,7 +58,7 @@ if __name__ == '__main__':
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
-    hifigan_parser = subparsers.add_parser('hifigan')
+    hg_parser = subparsers.add_parser('hifigan')
 
     args = parser.parse_args()
 
@@ -68,7 +71,7 @@ if __name__ == '__main__':
         paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
         checkpoint_path = paths.forward_checkpoints / 'latest_model.pt'
 
-    tts_model, config = load_forward_taco(checkpoint_path)
+    tts_model, config = load_tts_model(checkpoint_path)
     dsp = DSP.from_config(config)
 
     voc_model, voc_dsp = None, None
@@ -91,6 +94,7 @@ if __name__ == '__main__':
             texts = f.readlines()
 
     tts_k = tts_model.get_step() // 1000
+    tts_model.eval()
 
     simple_table([('Forward Tacotron', str(tts_k) + 'k'),
                   ('Vocoder Type', args.vocoder)])

@@ -18,11 +18,11 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE V2 --> V3 (16.07.2020)
-- Updated model architecture resulting in better synth quality and more param control
-- Less overfitting due to regularized encoder layers
-- Model can now be [exported with torchscript](#export-model-with-torchscript)
-- Git hash is stored in the model config to backtrace compatibility
+## UPDATE FastPitch (24.08.2021)
+- Implemented a modified [FastPitch](https://arxiv.org/abs/2006.06873) model as an alternative tts model
+- Simply set the tts_model type in the config [fast_pitch, forward_tacotron]
+- Check out the pretrained FastPitch model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)!
+
 
 Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
 

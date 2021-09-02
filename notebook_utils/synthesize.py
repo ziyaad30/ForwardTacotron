@@ -3,7 +3,7 @@ import numpy as np
 from typing import Callable
 
 from models.fatchord_version import WaveRNN
-from models.forward_tacotron import ForwardTacotron
+from utils.checkpoints import init_tts_model
 from utils.dsp import DSP
 from utils.text.cleaners import Cleaner
 from utils.text.tokenizer import Tokenizer
@@ -18,7 +18,7 @@ class Synthesizer:
         self.device = torch.device(device)
         tts_checkpoint = torch.load(tts_path, map_location=self.device)
         tts_config = tts_checkpoint['config']
-        tts_model = ForwardTacotron.from_config(tts_config)
+        tts_model = init_tts_model(tts_config)
         tts_model.load_state_dict(tts_checkpoint['model'])
         self.tts_model = tts_model
         self.wavernn = WaveRNN.from_checkpoint(voc_path)
@@ -42,17 +42,17 @@ class Synthesizer:
                                       alpha=alpha,
                                       pitch_function=pitch_function,
                                       energy_function=energy_function)
+        m = gen['mel_post'].cpu()
         if voc_model == 'griffinlim':
-            wav = self.dsp.griffinlim(gen['mel_post'], n_iter=32)
+            wav = self.dsp.griffinlim(m.squeeze().numpy(), n_iter=32)
         elif voc_model == 'wavernn':
-            m = torch.tensor(gen['mel_post']).unsqueeze(0)
             wav = self.wavernn.generate(mels=m,
                                         batched=True,
                                         target=11_000,
                                         overlap=550,
                                         mu_law=self.dsp.mu_law)
         else:
-            m = torch.tensor(gen['mel_post']).unsqueeze(0).cuda()
+            m = m.cuda()
             with torch.no_grad():
                 wav = self.melgan.inference(m).cpu().numpy()
         return wav

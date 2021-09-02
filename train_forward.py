@@ -7,13 +7,14 @@ from typing import Union
 
 import torch
 from torch import optim
+from torch.nn import init
 from torch.utils.data.dataloader import DataLoader
 
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
 from trainer.common import to_device
 from trainer.forward_trainer import ForwardTrainer
-from utils.checkpoints import restore_checkpoint
+from utils.checkpoints import restore_checkpoint, init_tts_model
 from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import DSP
@@ -71,8 +72,8 @@ if __name__ == '__main__':
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
-    print('\nInitialising Forward TTS Model...\n')
-    model = ForwardTacotron.from_config(config).to(device)
+    model = init_tts_model(config).to(device)
+    print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
                        path=paths.forward_checkpoints / 'latest_model.pt',
