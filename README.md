@@ -132,6 +132,7 @@ Here is what the ForwardTacotron tensorboard looks like:
 |---|---|---|
 |[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
 |[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
+|[fastpitch](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/thorsten_fastpitch_50k.pt)| [thorstenmueller (german)](https://github.com/thorstenMueller/deep-learning-german-tts) | latest |
 
 Our pre-trained LJSpeech model is compatible with the pre-trained vocoders:
 - [MelGAN](https://github.com/seungwonpark/melgan)
