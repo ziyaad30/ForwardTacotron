@@ -1,10 +1,9 @@
 import argparse
+from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
 from random import Random
-from typing import Tuple, Dict, Union
 
 import pyworld as pw
-from dataclasses import dataclass
 
 from utils.display import *
 from utils.dsp import *
@@ -12,10 +11,6 @@ from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 from utils.text.recipes import ljspeech
-
-
-# Helper functions for argument types
-from utils.text.tokenizer import Tokenizer
 
 
 def valid_n_workers(num):
