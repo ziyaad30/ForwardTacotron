@@ -1,7 +1,7 @@
 import argparse
+from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
 from random import Random
-from typing import Tuple, Dict
 
 import pyworld as pw
 
@@ -13,15 +13,21 @@ from utils.text.cleaners import Cleaner
 from utils.text.recipes import ljspeech
 
 
-# Helper functions for argument types
-from utils.text.tokenizer import Tokenizer
-
-
 def valid_n_workers(num):
     n = int(num)
     if n < 1:
         raise argparse.ArgumentTypeError('%r must be an integer greater than 0' % num)
     return n
+
+
+@dataclass
+class DataPoint:
+    item_id: str = None
+    mel_len: int = None
+    text: str = None
+    mel: np.array = None
+    quant: np.array = None
+    pitch: np.array = None
 
 
 class Preprocessor:
@@ -31,24 +37,25 @@ class Preprocessor:
                  text_dict: Dict[str, str],
                  cleaner: Cleaner,
                  lang: str,
-                 dsp: DSP):
+                 dsp: DSP) -> None:
         self.paths = paths
         self.text_dict = text_dict
         self.cleaner = cleaner
         self.lang = lang
         self.dsp = dsp
 
-    def __call__(self, path: Path) -> Tuple[str, int, str]:
-        wav_id = path.stem
-        m, x, raw_pitch = self._convert_file(path)
-        np.save(self.paths.mel/f'{wav_id}.npy', m, allow_pickle=False)
-        np.save(self.paths.quant/f'{wav_id}.npy', x, allow_pickle=False)
-        np.save(self.paths.raw_pitch/f'{wav_id}.npy', raw_pitch, allow_pickle=False)
-        text = self.text_dict[wav_id]
-        text = self.cleaner(text)
-        return wav_id, m.shape[-1], text
+    def __call__(self, path: Path) -> Union[DataPoint, None]:
+        try:
+            dp = self._convert_file(path)
+            np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
+            np.save(self.paths.quant/f'{dp.item_id}.npy', dp.quant, allow_pickle=False)
+            np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
+            return dp
+        except Exception as e:
+            print(e)
+            return None
 
-    def _convert_file(self, path: Path) -> Tuple[np.array, np.array, np.array]:
+    def _convert_file(self, path: Path) -> DataPoint:
         y = self.dsp.load_wav(path)
         if self.dsp.trim_long_silences:
            y = self.dsp.trim_long_silences(y)
@@ -67,7 +74,17 @@ class Preprocessor:
             quant = self.dsp.float_2_label(y, bits=16)
         else:
             raise ValueError(f'Unexpected voc mode {self.dsp.voc_mode}, should be either RAW or MOL.')
-        return mel.astype(np.float32), quant.astype(np.int64), pitch.astype(np.float32)
+
+        item_id = path.stem
+        text = self.text_dict[item_id]
+        text = self.cleaner(text)
+
+        return DataPoint(item_id=item_id,
+                         mel=mel.astype(np.float32),
+                         mel_len=mel.shape[-1],
+                         text=text,
+                         quant=quant.astype(np.int64),
+                         pitch=pitch.astype(np.float32))
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
@@ -115,10 +132,10 @@ if __name__ == '__main__':
                                 cleaner=cleaner,
                                 lang=config['preprocessing']['language'])
 
-    for i, (item_id, length, cleaned_text) in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):
-        if item_id in text_dict:
-            dataset += [(item_id, length)]
-            cleaned_texts += [(item_id, cleaned_text)]
+    for i, dp in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):
+        if dp is not None and dp.item_id in text_dict:
+            dataset += [(dp.item_id, dp.mel_len)]
+            cleaned_texts += [(dp.item_id, dp.text)]
         bar = progbar(i, len(wav_files))
         message = f'{bar} {i}/{len(wav_files)} '
         stream(message)
