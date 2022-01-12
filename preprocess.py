@@ -58,7 +58,7 @@ class Preprocessor:
     def _convert_file(self, path: Path) -> DataPoint:
         y = self.dsp.load_wav(path)
         if self.dsp.trim_long_silences:
-           y = self.dsp.trim_long_silences(y)
+           y = self.dsp.should_trim_long_silences(y)
         if self.dsp.should_trim_start_end_silence:
            y = self.dsp.trim_silence(y)
         peak = np.abs(y).max()
