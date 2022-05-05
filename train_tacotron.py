@@ -126,11 +126,11 @@ def create_align_features(model: Tacotron,
         with torch.no_grad():
             _, _, att_batch = model(x, mel)
 
-        x = batch['x'][0]
-        mel_len = batch['mel_len'][0]
-        item_id = batch['item_id'][0]
-        mel = batch['mel'][0, :, :mel_len]
-        att = att_batch[0, :mel_len, :]
+        x = batch['x'][0].cpu()
+        mel_len = batch['mel_len'][0].cpu()
+        item_id = batch['item_id'][0].cpu()
+        mel = batch['mel'][0, :, :mel_len].cpu()
+        att = att_batch[0, :mel_len, :].cpu()
 
         # we use the standard alignment score and the more accurate attention score from the duration extractor
         align_score, _ = attention_score(att_batch, batch['mel_len'], r=1)
