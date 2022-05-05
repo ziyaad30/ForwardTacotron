@@ -128,7 +128,7 @@ def create_align_features(model: Tacotron,
 
         x = batch['x'][0].cpu()
         mel_len = batch['mel_len'][0].cpu()
-        item_id = batch['item_id'][0].cpu()
+        item_id = batch['item_id'][0]
         mel = batch['mel'][0, :, :mel_len].cpu()
         att = att_batch[0, :mel_len, :].cpu()
 
