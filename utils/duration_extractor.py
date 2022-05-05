@@ -96,6 +96,8 @@ class DurationExtractor:
             att_shift = sil_tok_inds.float() * self.silence_prob_shift * 2 - self.silence_prob_shift
             att[i, :] = att[i, :] + att_shift
 
+        att[att < 0] = 0.
+        att[att > 1] = 1.
         path_probs = 1.-att[:mel_len, :]
         adj_matrix = to_adj_matrix(path_probs)
         dist_matrix, predecessors = dijkstra(csgraph=adj_matrix, directed=True,
