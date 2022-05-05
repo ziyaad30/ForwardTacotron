@@ -87,7 +87,9 @@ class DurationExtractor:
         # is usually very unreliable. As a result we get more accurate (larger) durations for unvoiced parts and
         # avoid 'leakage' of durations into surrounding word phonemes.
         sil_mask = mel.mean(dim=0) < self.silence_threshold
-        sil_mel_inds = list(sil_mask.nonzero().squeeze())
+        sil_mel_inds = sil_mask.nonzero().squeeze()
+        sil_mel_inds = list(sil_mel_inds) if len(sil_mel_inds.size()) > 0 else []
+
         sil_phon_inds = torch.tensor(silent_phonemes_indices)
         for i in sil_mel_inds:
             sil_tok_inds = torch.isin(x, sil_phon_inds)
