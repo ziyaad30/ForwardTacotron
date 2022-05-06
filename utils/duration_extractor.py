@@ -60,7 +60,7 @@ class DurationExtractor:
                  silence_threshold: float,
                  silence_prob_shift: float) -> None:
         """
-        :param silence_threshold: Mel threshold below which the voice is considered silent.
+        :param silence_threshold: Mel spec threshold below which the voice is considered silent.
         :param silence_prob_shift: Attention probability that is added to silent phonemes in unvoiced parts.
         """
         self.silence_prob_shift = silence_prob_shift
