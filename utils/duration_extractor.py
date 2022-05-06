@@ -70,15 +70,14 @@ class DurationExtractor:
                  x: torch.Tensor,
                  mel: torch.Tensor,
                  att: torch.Tensor) -> Tuple[torch.tensor, float]:
-
         """
         Extracts durations from the attention matrix by finding the shortest monotonic path from
         top left to bottom right.
 
         :param x: Tokenized sequence.
         :param mel: Mel spec.
-        :param att: Attention matrix with shape (mel_len, x_len)
-        :return: Tuple, where the first entry is the durations and the second entry is the average attention probability
+        :param att: Attention matrix with shape (mel_len, x_len).
+        :return: Tuple, where the first entry is the durations and the second entry is the average attention probability.
         """
         att = att[...]
         mel_len = mel.shape[-1]
@@ -96,8 +95,7 @@ class DurationExtractor:
             att_shift = sil_tok_inds.float() * self.silence_prob_shift * 2 - self.silence_prob_shift
             att[i, :] = att[i, :] + att_shift
 
-        att[att < 0] = 0.
-        att[att > 1] = 1.
+        att = torch.clamp(att, min=0., max=1.)
         path_probs = 1.-att[:mel_len, :]
         adj_matrix = to_adj_matrix(path_probs)
         dist_matrix, predecessors = dijkstra(csgraph=adj_matrix, directed=True,
