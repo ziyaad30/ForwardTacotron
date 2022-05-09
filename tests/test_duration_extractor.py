@@ -22,9 +22,9 @@ class TestDurationExtractor(unittest.TestCase):
         x = torch.tensor([15, 16, 10, 17, 18]).long()
         mel = torch.full((80, 10), fill_value=-10).float()
         att = new_diagonal_att((10, 5))
-        duraton_extractor = DurationExtractor(silence_threshold=-11.,
-                                              silence_prob_shift=0.)
-        durs, att_score = duraton_extractor(x=x, mel=mel, att=att)
+        duration_extractor = DurationExtractor(silence_threshold=-11.,
+                                               silence_prob_shift=0.)
+        durs, att_score = duration_extractor(x=x, mel=mel, att=att)
         expected = [2., 2., 2., 2., 2]
         self.assertEqual(expected, durs.tolist())
 
@@ -43,15 +43,15 @@ class TestDurationExtractor(unittest.TestCase):
         att[4:6, :] = 1./len(x)
 
         # duration extractor with no probability shift delivers larger durations after the pause (at index=3)
-        duraton_extractor = DurationExtractor(silence_threshold=-11.,
-                                              silence_prob_shift=0.)
-        durs, att_score = duraton_extractor(x=x, mel=mel, att=att)
+        duration_extractor = DurationExtractor(silence_threshold=-11.,
+                                               silence_prob_shift=0.)
+        durs, att_score = duration_extractor(x=x, mel=mel, att=att)
         expected = [2., 2., 1., 3., 2]
         self.assertEqual(expected, durs.tolist())
 
         # duration extractor with some probability shift delivers larger durations during the pause (at index=2)
-        duraton_extractor = DurationExtractor(silence_threshold=-11.,
-                                              silence_prob_shift=0.25)
-        durs, att_score = duraton_extractor(x=x, mel=mel, att=att)
+        duration_extractor = DurationExtractor(silence_threshold=-11.,
+                                               silence_prob_shift=0.25)
+        durs, att_score = duration_extractor(x=x, mel=mel, att=att)
         expected = [2., 2., 2., 2., 2]
         self.assertEqual(expected, durs.tolist())
