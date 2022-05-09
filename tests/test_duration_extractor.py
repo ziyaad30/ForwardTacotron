@@ -13,7 +13,7 @@ def new_diagonal_att(dims: Tuple[int, int]) -> torch.Tensor:
     return att
 
 
-class TestDurationextractor(unittest.TestCase):
+class TestDurationExtractor(unittest.TestCase):
 
     def setUp(self) -> None:
         pass
