@@ -8,7 +8,7 @@ from utils.duration_extractor import DurationExtractor
 
 def new_diagonal_att(dims: Tuple[int, int]) -> torch.Tensor:
     att = torch.zeros(dims).float()
-    for i in range(10):
+    for i in range(dims[0]):
         att[i, i//2] = 1
     return att
 
