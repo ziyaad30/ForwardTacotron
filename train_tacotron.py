@@ -18,7 +18,6 @@ from utils.duration_extractor import DurationExtractor
 from utils.files import pickle_binary, unpickle_binary, read_config
 from utils.metrics import attention_score
 from utils.paths import Paths
-from utils.text.tokenizer import Tokenizer
 
 
 def normalize_values(phoneme_val) -> Tuple[float, float]:
@@ -208,12 +207,14 @@ if __name__ == '__main__':
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
         trainer.train(model, optimizer)
-        print('Creating Attention Alignments and Pitch Values...')
+        print('Training finished, now creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
                                               max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
-                              paths=paths, pitch_max_freq=dsp.pitch_max_freq)
+                              paths=paths, pitch_max_freq=dsp.pitch_max_freq,
+                              silence_prob_shift=config['preprocessing']['silence_prob_shift'],
+                              silence_threshold=config['preprocessing']['silence_threshold'])
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 
 
