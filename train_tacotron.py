@@ -14,13 +14,17 @@ from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import DSP
-from utils.duration_extraction import extract_durations_per_count, extract_durations_with_dijkstra
+from utils.duration_extractor import DurationExtractor
 from utils.files import pickle_binary, unpickle_binary, read_config
 from utils.metrics import attention_score
 from utils.paths import Paths
 
 
-def normalize_values(phoneme_val):
+def normalize_values(phoneme_val) -> Tuple[float, float]:
+    """
+    Normalizes non-zero phoneme values to zero mean and unitary
+    variance and returns mean and std of the original distribution.
+    """
     nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
                                for item_id, v in phoneme_val])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
@@ -29,7 +33,7 @@ def normalize_values(phoneme_val):
         v -= mean
         v /= std
         v[zero_idxs] = 0.0
-    return mean, std
+    return float(mean), float(std)
 
 
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
@@ -100,7 +104,9 @@ def create_align_features(model: Tacotron,
                           train_set: DataLoader,
                           val_set: DataLoader,
                           paths: Paths,
-                          pitch_max_freq: float) -> None:
+                          pitch_max_freq: float,
+                          silence_threshold: float,
+                          silence_prob_shift: float) -> None:
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
     model.eval()
@@ -108,31 +114,40 @@ def create_align_features(model: Tacotron,
     iters = len(val_set) + len(train_set)
     dataset = itertools.chain(train_set, val_set)
     att_score_dict = {}
+    duration_extractor = DurationExtractor(silence_threshold=silence_threshold,
+                                           silence_prob_shift=silence_prob_shift)
+    sum_att_score = 0
 
-    if config['preprocessing']['extract_durations_with_dijkstra']:
-        print('Extracting durations using dijkstra...')
-        dur_extraction_func = extract_durations_with_dijkstra
-    else:
-        print('Extracting durations using attention peak counts...')
-        dur_extraction_func = extract_durations_per_count
-
+    print('Extracting durations using dijkstra...')
     for i, batch in enumerate(dataset, 1):
         batch = to_device(batch, device=device)
+        x, mel = batch['x'], batch['mel']
         with torch.no_grad():
-            _, _, att_batch = model(batch['x'], batch['mel'])
-        align_score, sharp_score = attention_score(att_batch, batch['mel_len'], r=1)
-        att_batch = np_now(att_batch)
-        seq, att, mel_len, item_id = batch['x'][0], att_batch[0], batch['mel_len'][0], batch['item_id'][0]
-        align_score, sharp_score = float(align_score[0]), float(sharp_score[0])
-        att_score_dict[item_id] = (align_score, sharp_score)
-        durs = dur_extraction_func(seq, att, mel_len)
+            _, _, att_batch = model(x, mel)
+
+        x = batch['x'][0].cpu()
+        mel_len = batch['mel_len'][0].cpu()
+        item_id = batch['item_id'][0]
+        mel = batch['mel'][0, :, :mel_len].cpu()
+        att = att_batch[0, :mel_len, :].cpu()
+
+        # we use the standard alignment score and the more accurate attention score from the duration extractor
+        align_score, _ = attention_score(att_batch, batch['mel_len'], r=1)
+        align_score = float(align_score[0])
+        durs, att_score = duration_extractor(x=x, mel=mel, att=att)
+        durs = np_now(durs).astype(np.int)
+        att_score_dict[item_id] = (align_score, att_score)
+        sum_att_score += att_score
+
         if np.sum(durs) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         np.save(str(paths.alg / f'{item_id}.npy'), durs, allow_pickle=False)
         bar = progbar(i, iters)
-        msg = f'{bar} {i}/{iters} Files '
+        msg = f'{bar} {i}/{iters} Files. Avg attention score: {sum_att_score / i} '
         stream(msg)
+
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
+
     print('Extracting Pitch Values...')
     extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                          save_path_energy=paths.phon_energy,
@@ -185,17 +200,21 @@ if __name__ == '__main__':
                                               max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
-                              paths=paths, pitch_max_freq=dsp.pitch_max_freq)
+                              paths=paths, pitch_max_freq=dsp.pitch_max_freq,
+                              silence_prob_shift=config['preprocessing']['silence_prob_shift'],
+                              silence_threshold=config['preprocessing']['silence_threshold'])
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
         trainer.train(model, optimizer)
-        print('Creating Attention Alignments and Pitch Values...')
+        print('Training finished, now creating Attention Alignments and Pitch Values...')
         train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
                                               max_mel_len=None,
                                               filter_attention=False)
         create_align_features(model=model, train_set=train_set, val_set=val_set,
-                              paths=paths, pitch_max_freq=dsp.pitch_max_freq)
+                              paths=paths, pitch_max_freq=dsp.pitch_max_freq,
+                              silence_prob_shift=config['preprocessing']['silence_prob_shift'],
+                              silence_threshold=config['preprocessing']['silence_threshold'])
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 
 
