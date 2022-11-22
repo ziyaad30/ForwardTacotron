@@ -1,11 +1,8 @@
-import os
-import shutil
-import tempfile
 import unittest
-import numpy as np
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-import torch
+import numpy as np
 
 from utils.dataset import ForwardDataset
 from utils.text.tokenizer import Tokenizer
@@ -14,15 +11,14 @@ from utils.text.tokenizer import Tokenizer
 class TestForwardDataset(unittest.TestCase):
 
     def setUp(self) -> None:
-        temp_dir = tempfile.mkdtemp(prefix='TestForwardDatasetTmp')
-        self.temp_dir = Path(temp_dir)
+        self.temp_dir = TemporaryDirectory(prefix='TestForwarDatasetTmp')
 
     def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        self.temp_dir.cleanup()
 
     def test_get_items(self) -> None:
         text_dict = {'0': 'a', '1': 'bc'}
-        data_dir = self.temp_dir / 'data'
+        data_dir = Path(self.temp_dir.name + '/data')
         mel_dir = data_dir / 'mel'
         alg_dir = data_dir / 'alg'
         pitch_dir = data_dir / 'phon_pitch'
@@ -37,14 +33,11 @@ class TestForwardDataset(unittest.TestCase):
         pitches = [np.full(1, fill_value=5), np.full(2, fill_value=6)]
         energies = [np.full(1, fill_value=6), np.full(2, fill_value=7)]
 
-        np.save(mel_dir / '0.npy', mels[0])
-        np.save(mel_dir / '1.npy', mels[1])
-        np.save(alg_dir / '0.npy', durs[0])
-        np.save(alg_dir / '1.npy', durs[1])
-        np.save(pitch_dir / '0.npy', pitches[0])
-        np.save(pitch_dir / '1.npy', pitches[1])
-        np.save(energy_dir / '0.npy', energies[0])
-        np.save(energy_dir / '1.npy', energies[1])
+        for i in range(2):
+            np.save(str(mel_dir / f'{i}.npy'), mels[i])
+            np.save(str(alg_dir / f'{i}.npy'), durs[i])
+            np.save(str(pitch_dir / f'{i}.npy'), pitches[i])
+            np.save(str(energy_dir / f'{i}.npy'), energies[i])
 
         dataset = ForwardDataset(path=data_dir,
                                  dataset_ids=['0', '1'],

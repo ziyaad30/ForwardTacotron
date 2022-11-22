@@ -43,11 +43,18 @@ preprocessing:
   use_phonemes: True                 # whether to phonemize the text
                                      # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
+
+
+duration_extraction:
+
   silence_threshold: -11             # normalized mel value below which the voice is considered silent
                                      # minimum mel value = -11.512925465 for zeros in the wav array (=log(1e-5),
                                      # where 1e-5 is a cutoff value)
-  silence_prob_shift: 0.25           # Increase probability for silent characters in periods of silence
+  silence_prob_shift: 0.25           # increase probability for silent characters in periods of silence
                                      # for better durations during non voiced periods
+  max_batch_size: 32                 # max allowed for binned dataloader used for tacotron inference
+  num_workers: 12                    # number of processes for costly dijkstra duration extraction
+
 
 tacotron:
 
