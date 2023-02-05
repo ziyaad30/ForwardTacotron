@@ -18,19 +18,10 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE FastPitch (24.08.2021)
-- Implemented a modified [FastPitch](https://arxiv.org/abs/2006.06873) model as an alternative tts model
-- Simply set the tts_model type in the config [fast_pitch, forward_tacotron]
-- Check out the pretrained FastPitch model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)!
-
-
-Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
-
-
-Energy conditioning reduces mel validation loss:
-<p align="center">
-  <img src="assets/energy_tb.png" width="700" />
-</p>
+## UPDATE Multispeaker (13.01.2022)
+- Implemented speaker embedding conditioning as in [paper](https://arxiv.org/abs/1806.04558)
+- No external embedding required, we use [Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
+- Multispeaker models can easily be fine-tuned to a smaller dataset.
 
 ## 🔈 Samples
 
@@ -57,7 +48,7 @@ Then install the rest with pip:
 pip install -r requirements.txt
 ```
 
-## 🚀 Training your own Model
+## 🚀 Training your own Model (Singlespeaker)
 
 Change the params in the config.yaml according to your needs and follow the steps below:
 
@@ -92,11 +83,6 @@ python gen_forward.py --input_text 'this is whatever you want it to be' hifigan
 ```
 To vocode the resulting .mel or .npy files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
 
-As in the original repo you can also use a trained WaveRNN vocoder:
-```
-python gen_forward.py --input_text 'this is whatever you want it to be' wavernn
-```
-
 For training the model on your own dataset just bring it to the LJSpeech-like format:
 ```
 |- dataset_folder/
@@ -126,13 +112,38 @@ Here is what the ForwardTacotron tensorboard looks like:
 </p>
 
 
+## Multispeaker Training
+Prepare the data in ljspeech format:
+```
+|- dataset_folder/
+|   |- metadata.csv
+|   |- wav/
+|       |- file1.wav
+|       |- ...
+```
+The metadata.csv is expected to have the speaker id in the second column:
+```
+id_001|speaker_1|this is the first text.
+id_002|speaker_1|this is the second text.
+id_003|speaker_2|this is the third text.
+...
+```
+We also support the VCTK and a pandas format 
+(can be set in the config multispeaker.yaml under preprocesing.metafile_format)
+
+Follow the same steps as for singlespaker, but provide the multispeaker config:
+ ```
+python preprocess.py --config configs/multispeaker.yaml --path /path/to/ljspeech
+python train_tacotron.py --config configs/multispeaker.yaml
+python train_forward.py --config configs/multispeaker.yaml
+```
+
 ## Pretrained Models
 
-| Model | Dataset | Commit |
-|---|---|---|
-|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
-|[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
-|[fastpitch](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/thorsten_fastpitch_50k.pt)| [thorstenmueller (german)](https://github.com/thorstenMueller/deep-learning-german-tts) | latest |
+| Model | Dataset | Commit Tag |
+|---|---|------------|
+|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | v3.1     |
+|[fastpitch](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/thorsten_fastpitch_50k.pt)| [thorstenmueller (german)](https://github.com/thorstenMueller/deep-learning-german-tts) | v3.1     |
 
 Our pre-trained LJSpeech model is compatible with the pre-trained vocoders:
 - [MelGAN](https://github.com/seungwonpark/melgan)
@@ -144,7 +155,6 @@ After downloading the models you can synthesize text using the pretrained models
 python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt wavernn --voc_checkpoint wave_step_575k.pt
 
 ```
-
 
 ## Export Model with TorchScript
 
@@ -164,30 +174,13 @@ For the necessary preprocessing steps (text to tokens) please refer to:
 gen_forward.py
 ```
 
-## Tips for training a WaveRNN model
-
-- From experience I recommend starting with the standard params (RAW mode with 9 bit), which
-should start to sound good after about 300k steps.
-- Sound quality of the models varies quite a bit, so it is important to cherry-pick the best one.
-- For cherry-picking it is useful to listen to the validation sound samples in tensorboard. 
-The sound quality of the samples is measured by an additional metric (L1 distance of mel specs).
-- The top k models according to the above metric are constantly monitored and checkpointed under path/to/checkpoint/top_k_models.
-
-Here is what the WaveRNN tensorboard looks like:
-<p align="center">
-  <img src="assets/tensorboard_wavernn.png" width="700" />
-</p>
-<p align="center">
-  <b>Figure 3:</b> Tensorboard example for training a WaveRNN model.
-</p>
-
-
 ## References
 
 * [FastSpeech: Fast, Robust and Controllable Text to Speech](https://arxiv.org/abs/1905.09263)
 * [FastPitch: Parallel Text-to-speech with Pitch Prediction](https://arxiv.org/abs/2006.06873)
 * [HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis](https://arxiv.org/abs/2010.05646)
 * [MelGAN: Generative Adversarial Networks for Conditional Waveform Synthesis](https://arxiv.org/abs/1910.06711)
+* [Transfer Learning from Speaker Verification to Multispeaker Text-To-Speech Synthesis](https://arxiv.org/abs/1806.04558)
 
 ## Acknowlegements
 
@@ -198,6 +191,7 @@ Here is what the WaveRNN tensorboard looks like:
 * [https://github.com/xcmyz/LightSpeech](https://github.com/xcmyz/LightSpeech)
 * [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 * [https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch](https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch)
+* [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 
 ## Maintainers
 

@@ -2,7 +2,7 @@ import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Tuple
+from typing import Tuple, Dict
 from unittest.mock import patch
 
 import numpy as np
@@ -26,8 +26,10 @@ def new_diagonal_attention(dims: Tuple[int, int, int]) -> torch.Tensor:
 
 class MockTacotron(torch.nn.Module):
 
-    def __call__(self, x: torch.Tensor, mel: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __call__(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """ We just use the mock model to get the returned diagonal attention matrix. """
+        mel = batch['mel']
+        x = batch['x']
         return x, x, new_diagonal_attention((1, mel.size(-1), x.size(-1)))
 
 
@@ -38,15 +40,18 @@ class TestDurationExtractionPipe(unittest.TestCase):
         self.resource_path = Path(test_path) / 'resources'
         self.config = read_config(self.resource_path / 'test_config.yaml')
         self.temp_dir = TemporaryDirectory(prefix='TestDurationExtractionPipeTmp')
-        self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
+        self.paths = Paths(data_path=self.temp_dir.name + '/data', tts_id='tts_test_id')
         self.train_dataset = [('id_1', 5), ('id_2', 10), ('id_3', 15)]
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
-        pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')
-        pickle_binary(self.val_dataset, self.paths.data / 'val_dataset.pkl')
+        pickle_binary(self.train_dataset, self.paths.train_dataset)
+        pickle_binary(self.val_dataset, self.paths.val_dataset)
         self.text_dict = {file_id: 'a' * length for file_id, length in self.train_dataset + self.val_dataset}
-        pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
+        self.speaker_dict = {file_id: 'default_speaker' for file_id, _ in self.train_dataset + self.val_dataset}
+        pickle_binary(self.text_dict, self.paths.text_dict)
+        pickle_binary(self.speaker_dict, self.paths.speaker_dict)
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
+            np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()

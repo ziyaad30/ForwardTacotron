@@ -103,7 +103,7 @@ class DurationExtractionPipeline:
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.to(device)
 
-        dataloader = get_binned_taco_dataloader(data_path=self.paths.data, max_batch_size=max_batch_size)
+        dataloader = get_binned_taco_dataloader(paths=self.paths, max_batch_size=max_batch_size)
 
         sum_items = 0
         sum_att_score = 0
@@ -111,7 +111,7 @@ class DurationExtractionPipeline:
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                _, _, attention_batch = model(batch['x'], batch['mel'])
+                _, _, attention_batch = model(batch)
             _, att_score = attention_score(attention_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
             B = batch['x_len'].size(0)
@@ -141,9 +141,9 @@ class DurationExtractionPipeline:
         The durations are saved as numpy arrays in paths.alg.
         """
 
-        train_set = unpickle_binary(self.paths.data / 'train_dataset.pkl')
-        val_set = unpickle_binary(self.paths.data / 'val_dataset.pkl')
-        text_dict = unpickle_binary(self.paths.data / 'text_dict.pkl')
+        train_set = unpickle_binary(self.paths.train_dataset)
+        val_set = unpickle_binary(self.paths.val_dataset)
+        text_dict = unpickle_binary(self.paths.text_dict)
         dataset = train_set + val_set
         dataset = [(file_id, mel_len) for file_id, mel_len in dataset
                    if (self.paths.att_pred / f'{file_id}.npy').is_file()]
