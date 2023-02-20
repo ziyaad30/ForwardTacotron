@@ -2,7 +2,7 @@
 tts_model_id: 'multispeaker_tts'
 data_path: 'data_multispeaker'                                        # output data path
 
-tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
+tts_model: 'multi_fast_pitch'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
 
 dsp:
@@ -151,10 +151,9 @@ multi_forward_tacotron:
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
 
 
-fast_pitch:
+multi_fast_pitch:
 
   model:
-    speaker_emb_dims: 256
     durpred_d_model: 128
     durpred_n_heads: 2
     durpred_layers: 4
