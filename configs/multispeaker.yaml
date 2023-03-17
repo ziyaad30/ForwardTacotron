@@ -154,6 +154,7 @@ multi_forward_tacotron:
 multi_fast_pitch:
 
   model:
+    speaker_emb_dims: 256
     durpred_d_model: 128
     durpred_n_heads: 2
     durpred_layers: 4
