@@ -28,7 +28,7 @@ class MultiForwardTrainer:
         self.paths = paths
         self.dsp = dsp
         self.config = config
-        self.train_cfg = config['multi_forward_tacotron']['training']
+        self.train_cfg = config[config['tts_model']]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
