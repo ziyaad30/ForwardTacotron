@@ -1,8 +1,11 @@
 import random
+from collections import Counter
+from dataclasses import dataclass
 from random import Random
 from typing import List, Tuple, Iterator
 
 import torch
+from tabulate import tabulate
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
@@ -11,8 +14,41 @@ from utils.files import unpickle_binary
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
 
-
 SHUFFLE_SEED = 42
+
+
+@dataclass
+class DurationStats:
+    att_sharpness_score: float
+    att_align_score: float
+    max_consecutive_ones: int
+    max_duration: int
+
+
+class DataFilter:
+
+    def __init__(self,
+                 duration_stats: Dict[str, DurationStats],
+                 min_attention_alignment: float,
+                 min_attention_sharpness: float,
+                 max_consecutive_duration_ones: int,
+                 max_duration: int):
+        self._duration_stats = duration_stats
+        self._att_min_alignment = min_attention_alignment
+        self._att_min_sharpness = min_attention_sharpness
+        self._max_consecutive_duration_ones = max_consecutive_duration_ones
+        self._max_duration = max_duration
+
+    def __call__(self, dataset: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
+        dataset_filtered = []
+        for item_id, mel_len in dataset:
+            dur_stat: DurationStats = self._duration_stats[item_id]
+            if all([dur_stat.att_align_score >= self._att_min_alignment,
+                    dur_stat.att_sharpness_score >= self._att_min_sharpness,
+                    dur_stat.max_consecutive_ones <= self._max_consecutive_duration_ones,
+                    dur_stat.max_duration <= self._max_duration]):
+                dataset_filtered.append((item_id, mel_len))
+        return dataset_filtered
 
 
 class BinnedLengthSampler(Sampler):
@@ -151,7 +187,7 @@ class BinnedTacoDataLoader:
 
         for a, b in zip(consecutive_split_points[:-1], consecutive_split_points[1:]):
             big_batch = dataset_indices[a:b]
-            batches = list(batchify(big_batch, batch_size=max_batch_size))
+            batches = list(_batchify(big_batch, batch_size=max_batch_size))
             all_batches.extend(batches)
 
         Random(SHUFFLE_SEED).shuffle(all_batches)
@@ -171,22 +207,104 @@ class BinnedTacoDataLoader:
         return len(self.all_batches)
 
 
-def get_taco_datasets(paths: Paths,
-                      batch_size: int,
-                      r: int,
-                      max_mel_len,
-                      num_workers=0) -> Tuple[DataLoader, DataLoader]:
+class TacoCollator:
 
-    tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.train_dataset)
-    val_data = unpickle_binary(paths.val_dataset)
-    text_dict = unpickle_binary(paths.text_dict)
-    speaker_dict = unpickle_binary(paths.speaker_dict)
-    train_data = filter_max_len(train_data, max_mel_len)
-    val_data = filter_max_len(val_data, max_mel_len)
+    def __init__(self, r: int) -> None:
+        self.r = r
+
+    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
+        x_len = [b['x_len'] for b in batch]
+        x_len = torch.tensor(x_len)
+        max_x_len = max(x_len)
+        text = [_pad1d(b['x'], max_x_len) for b in batch]
+        text = _stack_to_tensor(text).long()
+        spec_lens = [b['mel_len'] for b in batch]
+        max_spec_len = max(spec_lens) + 1
+        if max_spec_len % self.r != 0:
+            max_spec_len += self.r - max_spec_len % self.r
+        mel = [_pad2d(b['mel'], max_spec_len) for b in batch]
+        mel = _stack_to_tensor(mel)
+        item_id = [b['item_id'] for b in batch]
+        speaker_name = [b['speaker_name'] for b in batch]
+        mel_lens = [b['mel_len'] for b in batch]
+        mel_lens = torch.tensor(mel_lens)
+        speaker_emb = [b['speaker_emb'] for b in batch]
+        speaker_emb = _stack_to_tensor(speaker_emb)
+
+        return {'x': text, 'mel': mel, 'item_id': item_id,
+                'x_len': x_len, 'mel_len': mel_lens,
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+
+
+class ForwardCollator:
+
+    def __init__(self, taco_collator: TacoCollator) -> None:
+        self.taco_collator = taco_collator
+
+    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
+        output = self.taco_collator(batch)
+        x_len = [b['x_len'] for b in batch]
+        x_len = torch.tensor(x_len)
+        max_x_len = max(x_len)
+        dur = [_pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
+        dur = _stack_to_tensor(dur).float()
+        pitch = [_pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
+        pitch = _stack_to_tensor(pitch).float()
+        energy = [_pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
+        energy = _stack_to_tensor(energy).float()
+        pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
+        pitch_cond = _stack_to_tensor(pitch_cond).long()
+        output.update({
+            'pitch': pitch,
+            'energy': energy,
+            'dur': dur,
+            'pitch_cond': pitch_cond
+        })
+        return output
+
+
+def get_taco_dataloaders(paths: Paths,
+                         batch_size: int,
+                         r: int,
+                         max_mel_len: int,
+                         filter_duration_stats: bool,
+                         min_attention_alignment: float,
+                         min_attention_sharpness: float,
+                         max_consecutive_ones: int,
+                         max_duration: int,
+                         num_workers=0) -> Tuple[DataLoader, DataLoader]:
+
+    """Returns training and validation dataloaders.
+
+    Args:
+        paths (Paths): An instance of the Paths class containing file paths.
+        batch_size (int): The batch size for the dataloaders.
+        max_mel_len (int, optional): The maximum length of the mel spectrograms.
+        filter_duration_stats (bool): Whether to filter accordint to below duration stats.
+        min_attention_alignment (float): The minimum attention alignment value.
+        min_attention_sharpness (float): The minimum attention sharpness value.
+        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment.
+        max_duration (int): The maximum duration of the audio in seconds.
+        num_workers (int): The number of worker processes for loading data. Defaults to 0.
+
+    Returns:
+        Tuple[DataLoader, DataLoader]: A tuple of two PyTorch DataLoaders for training and validation.
+    """
+
+    train_data, val_data = _get_filtered_datasets(paths=paths,
+                                                  filter_duration_stats=filter_duration_stats,
+                                                  max_mel_len=max_mel_len,
+                                                  min_attention_alignment=min_attention_alignment,
+                                                  min_attention_sharpness=min_attention_sharpness,
+                                                  max_consecutive_ones=max_consecutive_ones,
+                                                  max_duration=max_duration)
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
+
+    tokenizer = Tokenizer()
+    text_dict = unpickle_binary(paths.text_dict)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
 
     train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
                                 text_dict=text_dict, speaker_dict=speaker_dict,
@@ -215,35 +333,45 @@ def get_taco_datasets(paths: Paths,
     return train_set, val_set
 
 
-def get_forward_datasets(paths: Paths,
-                         batch_size: int,
-                         max_mel_len,
-                         filter_attention=True,
-                         filter_min_alignment=0.5,
-                         filter_min_sharpness=0.9,
-                         num_workers=0) -> Tuple[DataLoader, DataLoader]:
+def get_forward_dataloaders(paths: Paths,
+                            batch_size: int,
+                            max_mel_len: int,
+                            filter_duration_stats: bool,
+                            min_attention_alignment: float,
+                            min_attention_sharpness: float,
+                            max_consecutive_ones: int,
+                            max_duration: int,
+                            num_workers=0) -> Tuple[DataLoader, DataLoader]:
+    """Returns training and validation dataloaders.
+
+    Args:
+        paths (Paths): An instance of the Paths class containing file paths.
+        batch_size (int): The batch size for the dataloaders.
+        max_mel_len (int, optional): The maximum length of the mel spectrograms.
+        filter_duration_stats (bool): Whether to filter accordint to below duration stats.
+        min_attention_alignment (float): The minimum attention alignment value.
+        min_attention_sharpness (float): The minimum attention sharpness value.
+        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment.
+        max_duration (int): The maximum duration of the audio in seconds.
+        num_workers (int): The number of worker processes for loading data. Defaults to 0.
+
+    Returns:
+        Tuple[DataLoader, DataLoader]: A tuple of two PyTorch DataLoaders for training and validation.
+    """
 
     tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.train_dataset)
-    val_data = unpickle_binary(paths.val_dataset)
+
+    train_data, val_data = _get_filtered_datasets(paths=paths,
+                                                  filter_duration_stats=filter_duration_stats,
+                                                  max_mel_len=max_mel_len,
+                                                  min_attention_alignment=min_attention_alignment,
+                                                  min_attention_sharpness=min_attention_sharpness,
+                                                  max_consecutive_ones=max_consecutive_ones,
+                                                  max_duration=max_duration)
+
     text_dict = unpickle_binary(paths.text_dict)
     speaker_dict = unpickle_binary(paths.speaker_dict)
-    train_data = filter_max_len(train_data, max_mel_len)
-    val_data = filter_max_len(val_data, max_mel_len)
-    train_len_original = len(train_data)
-
-    if filter_attention:
-        attention_score_dict = unpickle_binary(paths.att_score_dict)
-        train_data = filter_bad_attentions(dataset=train_data,
-                                           attention_score_dict=attention_score_dict,
-                                           min_alignment=filter_min_alignment,
-                                           min_sharpness=filter_min_sharpness)
-        val_data = filter_bad_attentions(dataset=val_data,
-                                         attention_score_dict=attention_score_dict,
-                                         min_alignment=filter_min_alignment,
-                                         min_sharpness=filter_min_sharpness)
-        print(f'Using {len(train_data)} train files. '
-              f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+    speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in speaker_dict}
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
@@ -251,9 +379,11 @@ def get_forward_datasets(paths: Paths,
     train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
                                    text_dict=text_dict, speaker_dict=speaker_dict,
                                    tokenizer=tokenizer)
+
     val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
                                  text_dict=text_dict, speaker_dict=speaker_dict,
                                  tokenizer=tokenizer)
+
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = ForwardCollator(taco_collator=TacoCollator(r=1))
 
@@ -282,96 +412,68 @@ def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedT
     return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
 
 
-class TacoCollator:
+def _get_filtered_datasets(paths: Paths,
+                           max_mel_len: int,
+                           filter_duration_stats: bool,
+                           min_attention_alignment: float,
+                           min_attention_sharpness: float,
+                           max_consecutive_ones: int,
+                           max_duration: int) -> Tuple[List[tuple], List[tuple]]:
 
-    def __init__(self, r: int) -> None:
-        self.r = r
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
 
-    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
-        x_len = [b['x_len'] for b in batch]
-        x_len = torch.tensor(x_len)
-        max_x_len = max(x_len)
-        text = [pad1d(b['x'], max_x_len) for b in batch]
-        text = stack_to_tensor(text).long()
-        spec_lens = [b['mel_len'] for b in batch]
-        max_spec_len = max(spec_lens) + 1
-        if max_spec_len % self.r != 0:
-            max_spec_len += self.r - max_spec_len % self.r
-        mel = [pad2d(b['mel'], max_spec_len) for b in batch]
-        mel = stack_to_tensor(mel)
-        item_id = [b['item_id'] for b in batch]
-        speaker_name = [b['speaker_name'] for b in batch]
-        mel_lens = [b['mel_len'] for b in batch]
-        mel_lens = torch.tensor(mel_lens)
-        speaker_emb = [b['speaker_emb'] for b in batch]
-        speaker_emb = stack_to_tensor(speaker_emb)
+    train_data = _filter_max_len(train_data, max_mel_len)
+    val_data = _filter_max_len(val_data, max_mel_len)
 
-        return {'x': text, 'mel': mel, 'item_id': item_id,
-                'x_len': x_len, 'mel_len': mel_lens,
-                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+    if filter_duration_stats:
+        duration_stats = unpickle_binary(paths.duration_stats)
+        data_filter = DataFilter(duration_stats=duration_stats,
+                                 min_attention_alignment=min_attention_alignment,
+                                 min_attention_sharpness=min_attention_sharpness,
+                                 max_consecutive_duration_ones=max_consecutive_ones,
+                                 max_duration=max_duration)
 
+        speaker_counts_orig = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
+        train_data = data_filter(train_data)
+        val_data = data_filter(val_data)
+        speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
 
-class ForwardCollator:
+        table = [(speaker,
+                  count,
+                  speaker_counts_orig[speaker],
+                  speaker_counts_orig[speaker]-count)
+                 for speaker, count in speaker_counts_filtered.most_common()]
+        print(tabulate(table, headers=('speaker', 'files used', 'files total', 'files removed')))
+        num_files = sum(speaker_counts_filtered.values())
+        num_filtered = sum(speaker_counts_orig.values()) - num_files
+        print(f'\nUsing {num_files} files, removed {num_filtered}')
 
-    def __init__(self, taco_collator: TacoCollator) -> None:
-        self.taco_collator = taco_collator
-
-    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
-        output = self.taco_collator(batch)
-        x_len = [b['x_len'] for b in batch]
-        x_len = torch.tensor(x_len)
-        max_x_len = max(x_len)
-        dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
-        dur = stack_to_tensor(dur).float()
-        pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
-        pitch = stack_to_tensor(pitch).float()
-        energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
-        energy = stack_to_tensor(energy).float()
-        pitch_cond = [pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
-        pitch_cond = stack_to_tensor(pitch_cond).long()
-        output.update({
-            'pitch': pitch,
-            'energy': energy,
-            'dur': dur,
-            'pitch_cond': pitch_cond
-        })
-        return output
+    return train_data, val_data
 
 
-def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
+def _filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
     return [(id, len) for id, len in dataset if len <= max_mel_len]
 
 
-def filter_bad_attentions(dataset: List[tuple],
-                          attention_score_dict: Dict[str, tuple],
-                          min_alignment: float,
-                          min_sharpness: float) -> List[tuple]:
-    dataset_filtered = []
-    for item_id, mel_len in dataset:
-        align_score, sharp_score = attention_score_dict[item_id]
-        if align_score > min_alignment \
-                and sharp_score > min_sharpness:
-            dataset_filtered.append((item_id, mel_len))
-    return dataset_filtered
-
-
-def stack_to_tensor(x: List[np.array]) -> torch.Tensor:
+def _stack_to_tensor(x: List[np.array]) -> torch.Tensor:
     x = np.stack(x)
     x = torch.tensor(x)
     return x
 
 
-def pad1d(x, max_len) -> np.array:
+def _pad1d(x, max_len) -> np.array:
     return np.pad(x, (0, max_len - len(x)), mode='constant')
 
 
-def pad2d(x, max_len) -> np.array:
+def _pad2d(x, max_len) -> np.array:
     return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
 
 
-def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
+def _batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
     input_len = len(input)
     output = []
     for i in range(0, input_len, batch_size):
