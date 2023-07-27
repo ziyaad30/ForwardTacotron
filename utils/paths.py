@@ -7,7 +7,7 @@ class Paths:
     def __init__(self, data_path, tts_id):
 
         # directories
-        self.base = Path(__file__).parent.parent.expanduser().resolve()
+        self.base = Path('/content/drive/MyDrive/ForwardTacotron')
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
         self.mel = self.data/'mel'
@@ -20,7 +20,7 @@ class Paths:
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'
         self.model_output = self.base / 'model_output'
-        self.taco_checkpoints = '/content/drive/MyDrive/ForwardTacotron/checkpoints' / f'{tts_id}.tacotron'
+        self.taco_checkpoints = self.base / 'checkpoints' / f'{tts_id}.tacotron'
         self.taco_log = self.taco_checkpoints / 'logs'
         self.forward_checkpoints = self.base/'checkpoints'/f'{tts_id}.forward'
         self.forward_log = self.forward_checkpoints/'logs'
